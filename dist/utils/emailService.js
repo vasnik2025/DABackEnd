@@ -546,7 +546,9 @@ async function sendAdminNewMemberNotificationEmail(details) {
     const timestamp = new Date().toISOString();
     const accountLabel = accountType === 'couple'
         ? 'Couple registration'
-        : `Single activation (${role === 'single_female' ? 'Unicorn' : 'Bull'})`;
+        : role
+            ? `Single activation (${role === 'single_female' ? 'Unicorn' : 'Bull'})`
+            : 'Single registration';
     const infoRows = [];
     const addRow = (label, value) => {
         if (typeof value === 'string' && value.trim().length) {
@@ -571,11 +573,17 @@ async function sendAdminNewMemberNotificationEmail(details) {
         .join('');
     const subject = accountType === 'couple'
         ? 'New couple registration on DateAstrum'
-        : 'New single member activated on DateAstrum';
+        : role
+            ? 'New single member activated on DateAstrum'
+            : 'New single registration on DateAstrum';
     const plainTextContent = `
 Team,
 
-A new ${accountType === 'couple' ? 'couple has completed registration' : 'single member has activated their access'}.
+A new ${accountType === 'couple'
+        ? 'couple has completed registration'
+        : role
+            ? 'single member has activated their access'
+            : 'single member just registered'}.
 
 ${plainDetails}
   `.trim();
@@ -583,7 +591,13 @@ ${plainDetails}
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
       <h2 style="color:#db2777;">${subject}</h2>
       <p>Team,</p>
-      <p>A new ${accountType === 'couple' ? 'couple' : 'single member'} just joined DateAstrum.</p>
+      <p>
+        A new ${accountType === 'couple'
+        ? 'couple'
+        : role
+            ? 'single member'
+            : 'single member'} just joined DateAstrum.
+      </p>
       <ul style="padding-left:1.2em;margin:1.5em 0;">
         ${htmlDetails}
       </ul>

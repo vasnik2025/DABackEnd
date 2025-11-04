@@ -5,6 +5,7 @@ exports.findUserByUsernameOrEmail = findUserByUsernameOrEmail;
 exports.findCoupleByEmails = findCoupleByEmails;
 exports.refreshCoupleMembershipStatus = refreshCoupleMembershipStatus;
 exports.createUser = createUser;
+exports.createSingleUser = createSingleUser;
 exports.listCoupleEmailsByCountry = listCoupleEmailsByCountry;
 exports.setUserEmailVerified = setUserEmailVerified;
 exports.setPartnerEmailVerified = setPartnerEmailVerified;
@@ -227,6 +228,38 @@ async function createUser(data) {
         0, 0
       );
       SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
+  `);
+    return res.recordset[0];
+}
+async function createSingleUser(data) {
+    const pool = await (0, db_1.getPool)();
+    const res = await pool.request()
+        .input('email', db_1.sql.NVarChar(320), data.email.toLowerCase())
+        .input('passwordHash', db_1.sql.NVarChar(255), data.passwordHash)
+        .input('username', db_1.sql.NVarChar(255), data.username)
+        .query(`
+      DECLARE @id UNIQUEIDENTIFIER = NEWID();
+      INSERT INTO SingleUsers (
+        UserID,
+        Email,
+        Username,
+        PasswordHash,
+        InviteSourceUserID,
+        CreatedAt,
+        UpdatedAt,
+        IsEmailVerified
+      )
+      VALUES (
+        @id,
+        @email,
+        @username,
+        @passwordHash,
+        NULL,
+        SYSUTCDATETIME(),
+        SYSUTCDATETIME(),
+        0
+      );
+      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
     `);
     return res.recordset[0];
 }
@@ -265,9 +298,17 @@ async function listCoupleEmailsByCountry(country, options) {
 }
 async function setUserEmailVerified(userId) {
     const pool = await (0, db_1.getPool)();
-    await pool.request()
+    const result = await pool
+        .request()
         .input('UserID', db_1.sql.VarChar(255), userId)
-        .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = @UserID');
+        .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
+    const updated = result.rowsAffected?.[0] ?? 0;
+    if (!updated) {
+        await pool
+            .request()
+            .input('UserID', db_1.sql.VarChar(255), userId)
+            .query('UPDATE SingleUsers SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
+    }
 }
 async function setPartnerEmailVerified(userId) {
     const pool = await (0, db_1.getPool)();
@@ -287,9 +328,24 @@ async function getUserVerificationStatus(userId) {
       FROM Users
       WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)
     `);
-    const record = result.recordset?.[0] ?? {};
+    const record = result.recordset?.[0];
+    if (record) {
+        return {
+            isEmailVerified: Boolean(record.isEmailVerified),
+            isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+        };
+    }
+    const singleResult = await pool
+        .request()
+        .input('UserID', db_1.sql.VarChar(255), userId)
+        .query(`
+      SELECT ISNULL(IsEmailVerified, 0) AS isEmailVerified
+      FROM SingleUsers
+      WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)
+    `);
+    const singleRecord = singleResult.recordset?.[0] ?? {};
     return {
-        isEmailVerified: Boolean(record.isEmailVerified),
-        isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+        isEmailVerified: Boolean(singleRecord.isEmailVerified),
+        isPartnerEmailVerified: true,
     };
 }

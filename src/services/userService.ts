@@ -1,4 +1,4 @@
-import { getPool, sql } from '../config/db';
+﻿import { getPool, sql } from '../config/db';
 
 export type DbUser = {
   id: string;
@@ -253,7 +253,7 @@ export async function createUser(data: {
   email: string;
   passwordHash: string;
   username: string;
-  partnerEmail: string;
+  partnerEmail: string | null;
   coupleType: string | null;
   country: string;
   city: string;
@@ -282,6 +282,43 @@ export async function createUser(data: {
         @id, @email, @passwordHash, @username, SYSUTCDATETIME(),
         @partnerEmail, @coupleType, @country, @city, @partner1Nickname, @partner2Nickname,
         0, 0
+      );
+      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
+  `);
+  return res.recordset[0];
+}
+
+export async function createSingleUser(data: {
+  email: string;
+  passwordHash: string;
+  username: string;
+}) {
+  const pool = await getPool();
+  const res = await pool.request()
+    .input('email', sql.NVarChar(320), data.email.toLowerCase())
+    .input('passwordHash', sql.NVarChar(255), data.passwordHash)
+    .input('username', sql.NVarChar(255), data.username)
+    .query(`
+      DECLARE @id UNIQUEIDENTIFIER = NEWID();
+      INSERT INTO SingleUsers (
+        UserID,
+        Email,
+        Username,
+        PasswordHash,
+        InviteSourceUserID,
+        CreatedAt,
+        UpdatedAt,
+        IsEmailVerified
+      )
+      VALUES (
+        @id,
+        @email,
+        @username,
+        @passwordHash,
+        NULL,
+        SYSUTCDATETIME(),
+        SYSUTCDATETIME(),
+        0
       );
       SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
     `);
@@ -338,10 +375,19 @@ export async function listCoupleEmailsByCountry(
 }
 
 export async function setUserEmailVerified(userId: string): Promise<void> {
-    const pool = await getPool();
-    await pool.request()
-        .input('UserID', sql.VarChar(255), userId)
-        .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = @UserID');
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('UserID', sql.VarChar(255), userId)
+    .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
+
+  const updated = result.rowsAffected?.[0] ?? 0;
+  if (!updated) {
+    await pool
+      .request()
+      .input('UserID', sql.VarChar(255), userId)
+      .query('UPDATE SingleUsers SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
+  }
 }
 
 export async function setPartnerEmailVerified(userId: string): Promise<void> {
@@ -366,9 +412,28 @@ export async function getUserVerificationStatus(
       WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)
     `);
 
-  const record = result.recordset?.[0] ?? {};
+  const record = result.recordset?.[0];
+  if (record) {
+    return {
+      isEmailVerified: Boolean(record.isEmailVerified),
+      isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+    };
+  }
+
+  const singleResult = await pool
+    .request()
+    .input('UserID', sql.VarChar(255), userId)
+    .query(`
+      SELECT ISNULL(IsEmailVerified, 0) AS isEmailVerified
+      FROM SingleUsers
+      WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)
+    `);
+
+  const singleRecord = singleResult.recordset?.[0] ?? {};
   return {
-    isEmailVerified: Boolean(record.isEmailVerified),
-    isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+    isEmailVerified: Boolean(singleRecord.isEmailVerified),
+    isPartnerEmailVerified: true,
   };
 }
+
+

@@ -10,6 +10,7 @@ import { getPool, sql } from '../config/db';
 import {
   findUserByEmail,
   createUser,
+  createSingleUser,
   findUserByUsernameOrEmail,
   setUserEmailVerified,
   setPartnerEmailVerified,
@@ -23,6 +24,7 @@ import {
   verifyRequestAndIssueResetToken,
   getRequestByResetToken,
 } from '../services/passwordResetService';
+import { upsertSingleProfile } from '../services/singleMemberService';
 import {
   sendVerificationEmail,
   sendPartnerVerificationEmail,
@@ -136,40 +138,114 @@ export async function register(req: Request, res: Response) {
     if (!parsed.success) {
       return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
     }
-    
-    const { email, password, partnerEmail, username, coupleType, country, city, partner1Nickname, partner2Nickname } = parsed.data.body;
+
+    const {
+      accountType,
+      email,
+      password,
+      partnerEmail,
+      username,
+      coupleType,
+      country,
+      city,
+      partner1Nickname,
+      partner2Nickname,
+    } = parsed.data.body;
+
+    const normalizedAccountType = accountType === 'single' ? 'single' : 'couple';
 
     if (!isPasswordStrong(password)) {
       return res.status(400).json({ message: PASSWORD_REQUIREMENTS_MESSAGE });
     }
 
-    const exists = await findUserByEmail(email);
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedPartnerEmail = partnerEmail ? normalizeEmail(partnerEmail) : null;
+    const trimmedUsername = username.trim();
+    const trimmedPartner1Nickname = partner1Nickname.trim();
+    const trimmedPartner2Nickname = partner2Nickname?.trim() ?? '';
+    const trimmedCountry = country.trim();
+    const trimmedCity = city.trim();
+
+    const existingByEmail = await findUserByEmail(normalizedEmail);
+    if (existingByEmail) return res.status(409).json({ message: 'Email already in use' });
+
+    const existingUsername = await findUserByUsernameOrEmail(trimmedUsername.toLowerCase());
+    if (existingUsername) return res.status(409).json({ message: 'Username already in use' });
+
+    const hash = await bcrypt.hash(password, 10);
+
+    if (normalizedAccountType === 'single') {
+      if (!trimmedPartner1Nickname.length) {
+        return res.status(400).json({ message: 'Nickname is required.' });
+      }
+
+      const singleUser = await createSingleUser({
+        email: normalizedEmail,
+        passwordHash: hash,
+        username: trimmedUsername,
+      });
+
+      try {
+        await upsertSingleProfile(singleUser.id, null, {
+          preferredNickname: trimmedPartner1Nickname,
+          contactEmail: normalizedEmail,
+          country: trimmedCountry || null,
+          city: trimmedCity || null,
+          shortBio: null,
+          interests: null,
+          playPreferences: null,
+          boundaries: null,
+          availabilityJson: null,
+        });
+      } catch (profileError) {
+        console.error('[auth/register] Failed to upsert single profile', profileError);
+      }
+
+      await sendVerificationEmail(singleUser.id, normalizedEmail);
+
+      try {
+        await sendAdminNewMemberNotificationEmail({
+          accountType: 'single',
+          primaryEmail: normalizedEmail,
+          username: trimmedUsername,
+          country: trimmedCountry || null,
+          city: trimmedCity || null,
+          userId: String(singleUser.id ?? ''),
+        });
+      } catch (notifyError) {
+        console.error('[auth/register] Failed to notify admin about new single registration', notifyError);
+      }
+
+      return res.status(201).json({
+        message: 'Registration successful! Please check your email to verify your account.',
+      });
+    }
+
+    const exists = existingByEmail;
     if (exists) return res.status(409).json({ message: 'Email already in use' });
-    if (partnerEmail) {
-        const partnerExists = await findUserByEmail(partnerEmail);
+    if (normalizedPartnerEmail) {
+        const partnerExists = await findUserByEmail(normalizedPartnerEmail);
         if (partnerExists) return res.status(409).json({ message: 'Partner email already in use' });
     }
 
-    const hash = await bcrypt.hash(password, 10);
-    
     const userPayload = {
-        email,
+        email: normalizedEmail,
         passwordHash: hash,
-        username,
-        partnerEmail,
+        username: trimmedUsername,
+        partnerEmail: normalizedPartnerEmail,
         coupleType: coupleType ?? null,
-        country,
-        city,
-        partner1Nickname,
-        partner2Nickname
+        country: trimmedCountry,
+        city: trimmedCity,
+        partner1Nickname: trimmedPartner1Nickname,
+        partner2Nickname: trimmedPartner2Nickname,
     };
     
     const user = await createUser(userPayload);
 
     let countryRecipientList: string[] = [];
-    if (country) {
+    if (trimmedCountry) {
       try {
-        const existingCouples = await listCoupleEmailsByCountry(country, {
+        const existingCouples = await listCoupleEmailsByCountry(trimmedCountry, {
           excludeUserId: String(user.id ?? ''),
         });
         const recipientLookup = new Map<string, string>();
@@ -202,19 +278,19 @@ export async function register(req: Request, res: Response) {
     }
 
     // Send verification emails
-    await sendVerificationEmail(user.id, email);
-    if (partnerEmail) {
-      await sendPartnerVerificationEmail(user.id, partnerEmail, username);
+    await sendVerificationEmail(user.id, normalizedEmail);
+    if (normalizedPartnerEmail) {
+      await sendPartnerVerificationEmail(user.id, normalizedPartnerEmail, trimmedUsername);
     }
     try {
       await sendAdminNewMemberNotificationEmail({
         accountType: 'couple',
-        primaryEmail: email,
-        username: username ?? null,
-        partnerEmail: partnerEmail ?? null,
+        primaryEmail: normalizedEmail,
+        username: trimmedUsername ?? null,
+        partnerEmail: normalizedPartnerEmail ?? null,
         coupleType: coupleType ?? null,
-        city: city ?? null,
-        country: country ?? null,
+        city: trimmedCity ?? null,
+        country: trimmedCountry ?? null,
         userId: String(user.id ?? ''),
         additionalRecipients: countryRecipientList,
       });

@@ -22,6 +22,7 @@ const authSchemas_1 = require("../validators/authSchemas");
 const db_1 = require("../config/db");
 const userService_1 = require("../services/userService");
 const passwordResetService_1 = require("../services/passwordResetService");
+const singleMemberService_1 = require("../services/singleMemberService");
 const emailService_1 = require("../utils/emailService");
 const passwordShare_1 = require("../utils/passwordShare");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
@@ -88,35 +89,92 @@ async function register(req, res) {
         if (!parsed.success) {
             return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
         }
-        const { email, password, partnerEmail, username, coupleType, country, city, partner1Nickname, partner2Nickname } = parsed.data.body;
+        const { accountType, email, password, partnerEmail, username, coupleType, country, city, partner1Nickname, partner2Nickname, } = parsed.data.body;
+        const normalizedAccountType = accountType === 'single' ? 'single' : 'couple';
         if (!(0, passwordPolicy_1.isPasswordStrong)(password)) {
             return res.status(400).json({ message: passwordPolicy_1.PASSWORD_REQUIREMENTS_MESSAGE });
         }
-        const exists = await (0, userService_1.findUserByEmail)(email);
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPartnerEmail = partnerEmail ? normalizeEmail(partnerEmail) : null;
+        const trimmedUsername = username.trim();
+        const trimmedPartner1Nickname = partner1Nickname.trim();
+        const trimmedPartner2Nickname = partner2Nickname?.trim() ?? '';
+        const trimmedCountry = country.trim();
+        const trimmedCity = city.trim();
+        const existingByEmail = await (0, userService_1.findUserByEmail)(normalizedEmail);
+        if (existingByEmail)
+            return res.status(409).json({ message: 'Email already in use' });
+        const existingUsername = await (0, userService_1.findUserByUsernameOrEmail)(trimmedUsername.toLowerCase());
+        if (existingUsername)
+            return res.status(409).json({ message: 'Username already in use' });
+        const hash = await bcryptjs_1.default.hash(password, 10);
+        if (normalizedAccountType === 'single') {
+            if (!trimmedPartner1Nickname.length) {
+                return res.status(400).json({ message: 'Nickname is required.' });
+            }
+            const singleUser = await (0, userService_1.createSingleUser)({
+                email: normalizedEmail,
+                passwordHash: hash,
+                username: trimmedUsername,
+            });
+            try {
+                await (0, singleMemberService_1.upsertSingleProfile)(singleUser.id, null, {
+                    preferredNickname: trimmedPartner1Nickname,
+                    contactEmail: normalizedEmail,
+                    country: trimmedCountry || null,
+                    city: trimmedCity || null,
+                    shortBio: null,
+                    interests: null,
+                    playPreferences: null,
+                    boundaries: null,
+                    availabilityJson: null,
+                });
+            }
+            catch (profileError) {
+                console.error('[auth/register] Failed to upsert single profile', profileError);
+            }
+            await (0, emailService_1.sendVerificationEmail)(singleUser.id, normalizedEmail);
+            try {
+                await (0, emailService_1.sendAdminNewMemberNotificationEmail)({
+                    accountType: 'single',
+                    primaryEmail: normalizedEmail,
+                    username: trimmedUsername,
+                    country: trimmedCountry || null,
+                    city: trimmedCity || null,
+                    userId: String(singleUser.id ?? ''),
+                });
+            }
+            catch (notifyError) {
+                console.error('[auth/register] Failed to notify admin about new single registration', notifyError);
+            }
+            return res.status(201).json({
+                message: 'Registration successful! Please check your email to verify your account.',
+            });
+        }
+        const exists = existingByEmail;
         if (exists)
             return res.status(409).json({ message: 'Email already in use' });
-        if (partnerEmail) {
-            const partnerExists = await (0, userService_1.findUserByEmail)(partnerEmail);
+        if (normalizedPartnerEmail) {
+            const partnerExists = await (0, userService_1.findUserByEmail)(normalizedPartnerEmail);
             if (partnerExists)
                 return res.status(409).json({ message: 'Partner email already in use' });
         }
-        const hash = await bcryptjs_1.default.hash(password, 10);
         const userPayload = {
-            email,
+            email: normalizedEmail,
             passwordHash: hash,
-            username,
-            partnerEmail,
+            username: trimmedUsername,
+            partnerEmail: normalizedPartnerEmail,
             coupleType: coupleType ?? null,
-            country,
-            city,
-            partner1Nickname,
-            partner2Nickname
+            country: trimmedCountry,
+            city: trimmedCity,
+            partner1Nickname: trimmedPartner1Nickname,
+            partner2Nickname: trimmedPartner2Nickname,
         };
         const user = await (0, userService_1.createUser)(userPayload);
         let countryRecipientList = [];
-        if (country) {
+        if (trimmedCountry) {
             try {
-                const existingCouples = await (0, userService_1.listCoupleEmailsByCountry)(country, {
+                const existingCouples = await (0, userService_1.listCoupleEmailsByCountry)(trimmedCountry, {
                     excludeUserId: String(user.id ?? ''),
                 });
                 const recipientLookup = new Map();
@@ -143,19 +201,19 @@ async function register(req, res) {
             }
         }
         // Send verification emails
-        await (0, emailService_1.sendVerificationEmail)(user.id, email);
-        if (partnerEmail) {
-            await (0, emailService_1.sendPartnerVerificationEmail)(user.id, partnerEmail, username);
+        await (0, emailService_1.sendVerificationEmail)(user.id, normalizedEmail);
+        if (normalizedPartnerEmail) {
+            await (0, emailService_1.sendPartnerVerificationEmail)(user.id, normalizedPartnerEmail, trimmedUsername);
         }
         try {
             await (0, emailService_1.sendAdminNewMemberNotificationEmail)({
                 accountType: 'couple',
-                primaryEmail: email,
-                username: username ?? null,
-                partnerEmail: partnerEmail ?? null,
+                primaryEmail: normalizedEmail,
+                username: trimmedUsername ?? null,
+                partnerEmail: normalizedPartnerEmail ?? null,
                 coupleType: coupleType ?? null,
-                city: city ?? null,
-                country: country ?? null,
+                city: trimmedCity ?? null,
+                country: trimmedCountry ?? null,
                 userId: String(user.id ?? ''),
                 additionalRecipients: countryRecipientList,
             });

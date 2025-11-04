@@ -12,6 +12,7 @@ exports.loginSchema = zod_1.z.object({
 });
 exports.registerSchema = zod_1.z.object({
     body: zod_1.z.object({
+        accountType: zod_1.z.enum(['single', 'couple']).default('couple'),
         username: zod_1.z.string().min(1, 'Username is required.'),
         email: zod_1.z.string().email('Invalid email'),
         password: zod_1.z
@@ -25,12 +26,24 @@ exports.registerSchema = zod_1.z.object({
                 });
             }
         }),
-        partnerEmail: zod_1.z.string().email('Invalid partner email.'),
-        coupleType: zod_1.z.enum(['mf', 'mm', 'ff', 'couple', 'MF', 'MM', 'FF', 'Couple']).nullable(),
+        partnerEmail: zod_1.z.string().email('Invalid partner email.').optional().nullable(),
+        coupleType: zod_1.z.enum(['mf', 'mm', 'ff', 'couple', 'MF', 'MM', 'FF', 'Couple']).nullable().optional(),
         country: zod_1.z.string().min(1, 'Country is required.'),
         city: zod_1.z.string().min(1, 'City is required.'),
         partner1Nickname: zod_1.z.string().min(1, 'Partner 1 Nickname is required.'),
-        partner2Nickname: zod_1.z.string().min(1, 'Partner 2 Nickname is required.'),
+        partner2Nickname: zod_1.z.string().min(1, 'Partner 2 Nickname is required.').optional().nullable(),
+    }).superRefine((data, ctx) => {
+        if (data.accountType === 'couple') {
+            if (!data.partnerEmail) {
+                ctx.addIssue({ code: zod_1.z.ZodIssueCode.custom, path: ['partnerEmail'], message: 'Partner email is required for couple accounts.' });
+            }
+            if (!data.partner2Nickname) {
+                ctx.addIssue({ code: zod_1.z.ZodIssueCode.custom, path: ['partner2Nickname'], message: 'Partner 2 nickname is required for couple accounts.' });
+            }
+            if (!data.coupleType) {
+                ctx.addIssue({ code: zod_1.z.ZodIssueCode.custom, path: ['coupleType'], message: 'Couple type is required.' });
+            }
+        }
     }),
 });
 exports.resendVerificationSchema = zod_1.z.object({
