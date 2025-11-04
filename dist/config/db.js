@@ -50,6 +50,33 @@ function extractDatabaseName(connectionString) {
     }
     return null;
 }
+function sanitizeSqlError(error) {
+    if (!error)
+        return 'Unknown error';
+    if (typeof error === 'string')
+        return error;
+    if (error instanceof Error) {
+        return sanitizeSqlError({ message: error.message, stack: error.stack });
+    }
+    const err = error;
+    if (!err)
+        return 'Unknown error';
+    const fragments = [];
+    if (err.code)
+        fragments.push(`code=${err.code}`);
+    if (typeof err.number === 'number')
+        fragments.push(`number=${err.number}`);
+    if (err.message) {
+        fragments.push(err.message.replace(/password\s*=\s*[^;]+/gi, 'password=***'));
+    }
+    if (err.stack) {
+        const [firstLine] = err.stack.split('\n');
+        if (firstLine && !fragments.includes(firstLine)) {
+            fragments.push(firstLine.replace(/password\s*=\s*[^;]+/gi, 'password=***'));
+        }
+    }
+    return fragments.join(' | ') || 'Unknown SQL error';
+}
 async function closePool(pool) {
     if (!pool)
         return;
@@ -86,11 +113,18 @@ async function createPool() {
             await invalidatePool();
         }
     });
-    const connectedPool = await pool.connect();
-    connectedPool.requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
     const dbName = extractDatabaseName(normalizedConnectionString) ?? 'DateAstrum';
-    console.log(`[database] Connection established to ${dbName} (DateAstrum Azure SQL).`);
-    return connectedPool;
+    console.log(`[database] Attempting connection to ${dbName} (DateAstrum Azure SQL)...`);
+    try {
+        const connectedPool = await pool.connect();
+        connectedPool.requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
+        console.log(`[database] Connection established to ${dbName} (DateAstrum Azure SQL).`);
+        return connectedPool;
+    }
+    catch (err) {
+        console.error(`[database] Connection failed for ${dbName}: ${sanitizeSqlError(err)}`);
+        throw err;
+    }
 }
 async function getPool() {
     if (!poolPromise) {

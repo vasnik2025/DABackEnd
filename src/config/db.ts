@@ -50,6 +50,29 @@ function extractDatabaseName(connectionString: string): string | null {
   return null;
 }
 
+function sanitizeSqlError(error: unknown): string {
+  if (!error) return 'Unknown error';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) {
+    return sanitizeSqlError({ message: error.message, stack: error.stack });
+  }
+  const err = error as { message?: string; code?: string; number?: number; stack?: string } | undefined;
+  if (!err) return 'Unknown error';
+  const fragments: string[] = [];
+  if (err.code) fragments.push(`code=${err.code}`);
+  if (typeof err.number === 'number') fragments.push(`number=${err.number}`);
+  if (err.message) {
+    fragments.push(err.message.replace(/password\s*=\s*[^;]+/gi, 'password=***'));
+  }
+  if (err.stack) {
+    const [firstLine] = err.stack.split('\n');
+    if (firstLine && !fragments.includes(firstLine)) {
+      fragments.push(firstLine.replace(/password\s*=\s*[^;]+/gi, 'password=***'));
+    }
+  }
+  return fragments.join(' | ') || 'Unknown SQL error';
+}
+
 async function closePool(pool: sql.ConnectionPool | undefined | null) {
   if (!pool) return;
   try {
@@ -86,11 +109,17 @@ async function createPool(): Promise<sql.ConnectionPool> {
     }
   });
 
-  const connectedPool = await pool.connect();
-  (connectedPool as unknown as { requestTimeout?: number }).requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
   const dbName = extractDatabaseName(normalizedConnectionString) ?? 'DateAstrum';
-  console.log(`[database] Connection established to ${dbName} (DateAstrum Azure SQL).`);
-  return connectedPool;
+  console.log(`[database] Attempting connection to ${dbName} (DateAstrum Azure SQL)...`);
+  try {
+    const connectedPool = await pool.connect();
+    (connectedPool as unknown as { requestTimeout?: number }).requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
+    console.log(`[database] Connection established to ${dbName} (DateAstrum Azure SQL).`);
+    return connectedPool;
+  } catch (err) {
+    console.error(`[database] Connection failed for ${dbName}: ${sanitizeSqlError(err)}`);
+    throw err;
+  }
 }
 
 export async function getPool(): Promise<sql.ConnectionPool> {
