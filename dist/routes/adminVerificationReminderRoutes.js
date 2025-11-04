@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const verificationReminderController_1 = require("../controllers/verificationReminderController");
+const router = (0, express_1.Router)();
+router.use(auth_1.readUser);
+router.get('/summary', verificationReminderController_1.handleVerificationReminderSummary);
+router.get('/recipients', verificationReminderController_1.handleListVerificationRecipients);
+router.post('/send', verificationReminderController_1.handleSendVerificationReminders);
+exports.default = router;

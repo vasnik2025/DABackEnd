@@ -1,0 +1,69 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sql = void 0;
+exports.getPool = getPool;
+const mssql_1 = __importDefault(require("mssql"));
+exports.sql = mssql_1.default;
+const dbServer = process.env.DB_SERVER;
+const dbUser = process.env.DB_USER;
+const dbPassword = process.env.DB_PASSWORD;
+const dbName = process.env.DB_NAME;
+const dbPort = process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 1433;
+const dbEncrypt = process.env.DB_ENCRYPT === 'true'; // Default to false if not 'true'
+const dbTrustServerCertificate = process.env.DB_TRUST_SERVER_CERTIFICATE === 'true'; // Default to false if not 'true'
+if (!dbServer || !dbUser || !dbPassword || !dbName) {
+    const missingVars = [];
+    if (!dbServer)
+        missingVars.push('DB_SERVER');
+    if (!dbUser)
+        missingVars.push('DB_USER');
+    if (!dbPassword)
+        missingVars.push('DB_PASSWORD');
+    if (!dbName)
+        missingVars.push('DB_NAME');
+    throw new Error(`Missing required database environment variables: ${missingVars.join(', ')}`);
+}
+const config = {
+    user: dbUser,
+    password: dbPassword,
+    server: dbServer,
+    database: dbName,
+    port: dbPort,
+    options: {
+        encrypt: dbEncrypt, // Use for Azure SQL or if your SQL Server requires it
+        trustServerCertificate: dbTrustServerCertificate // Use for local development with self-signed certs
+    },
+    pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000
+    }
+};
+let pool;
+async function getPool() {
+    if (pool && pool.connected) {
+        return pool;
+    }
+    try {
+        pool = await new mssql_1.default.ConnectionPool(config).connect();
+        console.log('✅ Connected to SQL Server using individual DB_VARS');
+        pool.on('error', err => {
+            console.error('SQL Pool Error:', err);
+            // Optionally, try to re-establish connection or handle error
+            pool.close(); // Close the errored pool
+            // Consider setting pool to undefined so it can be recreated
+        });
+        return pool;
+    }
+    catch (err) {
+        console.error('❌ Failed to connect to SQL Server:', err);
+        // Ensure pool is not in a half-open state if connection fails
+        if (pool && !pool.connected) {
+            await pool.close().catch(closeErr => console.error('Error closing pool after connection failure:', closeErr));
+        }
+        throw err;
+    }
+}

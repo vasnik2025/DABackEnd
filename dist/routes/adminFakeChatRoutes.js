@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const adminFakeChatController_1 = require("../controllers/adminFakeChatController");
+const router = (0, express_1.Router)();
+router.get('/', adminFakeChatController_1.listFakeConversations);
+router.get('/:fakeUserId/:realUserId', adminFakeChatController_1.getFakeConversation);
+router.get('/:fakeUserId/:realUserId/media', adminFakeChatController_1.listFakeChatMedia);
+router.post('/:fakeUserId/:realUserId/media', adminFakeChatController_1.uploadFakeChatMedia);
+router.post('/:fakeUserId/:realUserId/messages', adminFakeChatController_1.adminSendFakeMessage);
+exports.default = router;

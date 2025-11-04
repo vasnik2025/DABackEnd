@@ -1,0 +1,116 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sql = void 0;
+exports.getPool = getPool;
+exports.withSqlRetry = withSqlRetry;
+const mssql_1 = __importDefault(require("mssql"));
+exports.sql = mssql_1.default;
+const DEFAULT_REQUEST_TIMEOUT_MS = 120000;
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_DELAY_MS = 200;
+let poolPromise = null;
+const TRANSIENT_ERROR_CODES = new Set(['ESOCKET', 'ECONNRESET', 'ETIMEOUT']);
+const TRANSIENT_ERROR_MESSAGES = ['connection lost', 'write econnreset', 'timeout'];
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function isTransientError(error) {
+    const err = error;
+    if (!err)
+        return false;
+    const code = (err.code ?? '').toUpperCase();
+    if (code && TRANSIENT_ERROR_CODES.has(code)) {
+        return true;
+    }
+    const message = (err.message ?? '').toLowerCase();
+    return TRANSIENT_ERROR_MESSAGES.some((fragment) => message.includes(fragment));
+}
+function getAzureSqlConnectionString() {
+    const fromCustom = process.env.AZURE_SQL_CONNECTIONSTRING;
+    const fromSqlNamed = process.env.SQLCONNSTR_swingerunion;
+    const fromCustomNamed = process.env.CUSTOMCONNSTR_swingerunion;
+    const fromColon = process.env.ConnectionStrings__swingerunion;
+    const connectionString = fromCustom || fromSqlNamed || fromCustomNamed || fromColon;
+    if (!connectionString) {
+        throw new Error('Missing Azure SQL connection string. Set one of: ' +
+            'AZURE_SQL_CONNECTIONSTRING, SQLCONNSTR_swingerunion, CUSTOMCONNSTR_swingerunion, or ConnectionStrings__swingerunion');
+    }
+    return connectionString;
+}
+async function closePool(pool) {
+    if (!pool)
+        return;
+    try {
+        await pool.close();
+    }
+    catch (err) {
+        console.error('SQL pool close error', err);
+    }
+}
+async function invalidatePool() {
+    if (!poolPromise)
+        return;
+    try {
+        const pool = await poolPromise.catch(() => null);
+        await closePool(pool);
+    }
+    finally {
+        poolPromise = null;
+    }
+}
+async function createPool() {
+    const rawConnectionString = getAzureSqlConnectionString();
+    const normalizedConnectionString = rawConnectionString.trim();
+    const hasTimeoutConfigured = /request\s*timeout\s*=/i.test(normalizedConnectionString);
+    const timeoutFragment = `Request Timeout=${DEFAULT_REQUEST_TIMEOUT_MS}`;
+    const connectionString = hasTimeoutConfigured
+        ? normalizedConnectionString.replace(/request\s*timeout\s*=\s*[^;]+/i, timeoutFragment)
+        : `${normalizedConnectionString}${normalizedConnectionString.endsWith(';') ? '' : ';'}${timeoutFragment}`;
+    const pool = new mssql_1.default.ConnectionPool(connectionString);
+    pool.on('error', async (err) => {
+        console.error('SQL pool error', err);
+        if (isTransientError(err)) {
+            await invalidatePool();
+        }
+    });
+    const connectedPool = await pool.connect();
+    connectedPool.requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
+    console.log('Connected to Azure SQL.');
+    return connectedPool;
+}
+async function getPool() {
+    if (!poolPromise) {
+        poolPromise = createPool().catch(async (err) => {
+            await invalidatePool();
+            throw err;
+        });
+    }
+    return poolPromise;
+}
+async function withSqlRetry(operation, options) {
+    const attempts = Math.max(1, options?.attempts ?? DEFAULT_MAX_RETRIES);
+    const baseDelayMs = Math.max(0, options?.baseDelayMs ?? DEFAULT_RETRY_DELAY_MS);
+    let lastError;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+            const pool = await getPool();
+            return await operation(pool);
+        }
+        catch (error) {
+            lastError = error;
+            const shouldRetry = attempt < attempts && isTransientError(error);
+            if (shouldRetry) {
+                await invalidatePool();
+                const delay = baseDelayMs * attempt;
+                if (delay > 0) {
+                    await wait(delay);
+                }
+                continue;
+            }
+            throw error;
+        }
+    }
+    // Should never reach here because we throw when attempts are exhausted.
+    throw lastError;
+}

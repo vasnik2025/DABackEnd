@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const reengagementController_1 = require("../controllers/reengagementController");
+const router = (0, express_1.Router)();
+router.use(auth_1.readUser);
+router.get('/summary', reengagementController_1.handleGetReengagementSummary);
+router.get('/recipients', reengagementController_1.handleListReengagementRecipients);
+router.post('/send', reengagementController_1.handleSendReengagementReminders);
+exports.default = router;
