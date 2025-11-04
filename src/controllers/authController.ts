@@ -39,7 +39,7 @@ import {
 } from '../utils/passwordPolicy';
 
 const COOKIE_NAME = 'sua';
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 
 const PASSWORD_RESET_CODE_EXPIRATION_MINUTES = Math.max(
   1,

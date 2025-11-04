@@ -14,7 +14,7 @@ import { OperationalError } from '../utils/errorHandler';
 import type { AuthedRequest } from '../middleware/auth';
 
 const CONTACT_NAME = 'DateAstrum Splash Visitor';
-const CONTACT_EMAIL = 'noreply@DateAstrum.com';
+const CONTACT_EMAIL = 'noreply@dateastrum.com';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function extractIpAddress(req: Request): string | null {

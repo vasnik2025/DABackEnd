@@ -6,8 +6,8 @@ const router = Router();
 
 const mediaCors = cors({
   origin: [
-    "https://DateAstrum.com",
-    "https://www.DateAstrum.com",
+    "https://dateastrum.com",
+    "https://www.dateastrum.com",
     "http://localhost:5173",
     "http://localhost:3000",
   ],

@@ -77,7 +77,7 @@ export type InviteVerificationOutcome =
   | { status: 'consumed' }
   | { status: 'invalid' };
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 
 const INVITE_TOKEN_BYTES = 32;
 const TOKEN_SALT_BYTES = 16;
@@ -2416,6 +2416,7 @@ export function getSinglePlanProductCode(): string {
 export function isActiveStatus(status: string): status is ActiveInviteStatus {
   return ACTIVE_STATUS_SET.has(status);
 }
+
 
 
 

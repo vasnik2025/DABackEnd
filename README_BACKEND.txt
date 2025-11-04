@@ -13,6 +13,6 @@
    - Registered router.post('/resend-verifications', resendAllVerifications)
 
 Required App Settings:
-   FRONTEND_URL = https://DateAstrum.com
-   BACKEND_URL  = https://api.DateAstrum.com
+   FRONTEND_URL = https://dateastrum.com
+   BACKEND_URL  = https://api.dateastrum.com
 

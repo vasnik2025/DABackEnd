@@ -11,7 +11,7 @@ import {
 import { OperationalError } from '../utils/errorHandler';
 import { sendReengagementReminderEmail } from '../utils/emailService';
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 
 const buildPreferencesUrl = (token: string): string =>
   `${FRONTEND_URL}/preferences/reengagement?token=${encodeURIComponent(token)}`;
