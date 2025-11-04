@@ -38,7 +38,7 @@ const db_1 = require("../config/db");
 const errorHandler_1 = require("../utils/errorHandler");
 const emailService_1 = require("../utils/emailService");
 const ACTIVE_INVITE_STATUSES = ['pending', 'awaiting_verification', 'awaiting_activation', 'awaiting_couple'];
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://swingerunion.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
 const INVITE_TOKEN_BYTES = 32;
 const TOKEN_SALT_BYTES = 16;
 const HASH_ALGORITHM = 'sha256';
@@ -258,7 +258,7 @@ async function getInviterEmailContext(userId) {
     const row = snapshot.recordset?.[0] ?? null;
     if (!row) {
         return {
-            displayName: 'A SwingerUnion couple',
+            displayName: 'A DateAstrum couple',
             primaryEmail: null,
             partnerEmail: null,
         };
@@ -279,7 +279,7 @@ async function getInviterEmailContext(userId) {
         displayName = String(row.Email);
     }
     else {
-        displayName = 'A SwingerUnion couple';
+        displayName = 'A DateAstrum couple';
     }
     return {
         displayName,

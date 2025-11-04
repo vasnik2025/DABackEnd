@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+﻿import type { Request, Response, NextFunction } from 'express';
 import paypal from '@paypal/checkout-server-sdk';
 
 import { OperationalError } from '../utils/errorHandler';
@@ -54,14 +54,14 @@ const SECRET = resolveEnv('PAYPAL_SECRET', [
 const MEMBERSHIP_PRICE_EUR = process.env.PAYPAL_MEMBERSHIP_PRICE_EUR || '2.00';
 const PURCHASE_DESCRIPTION =
   process.env.PAYPAL_PURCHASE_DESCRIPTION ||
-  '1 Month Platinum Membership for SwingerUnion.com';
+  '1 Month Platinum Membership for DateAstrum.com';
 const SINGLE_PRICE_EUR = process.env.PAYPAL_SINGLE_PRICE_EUR || '15.00';
 const SINGLE_PURCHASE_DESCRIPTION =
   process.env.PAYPAL_SINGLE_PURCHASE_DESCRIPTION ||
-  '1 Month Single Access Membership for SwingerUnion.com';
+  '1 Month Single Access Membership for DateAstrum.com';
 const FRONTEND_BASE_URL =
   resolveEnv('PAYPAL_FRONTEND_BASE_URL', ['FRONTEND_URL', 'PUBLIC_FRONTEND_URL']) ||
-  'https://swingerunion.com';
+  'https://DateAstrum.com';
 const NORMALIZED_FRONTEND_BASE = FRONTEND_BASE_URL.replace(/\/$/, '');
 const DEFAULT_RETURN_URL =
   resolveEnv('PAYPAL_RETURN_URL', ['PAYPAL_SUCCESS_URL']) ||
@@ -205,7 +205,7 @@ export const createOrder = async (
           description: isSinglePlan ? SINGLE_PURCHASE_DESCRIPTION : PURCHASE_DESCRIPTION,
           custom_id: customMetadata,
           reference_id: planDescriptor,
-          soft_descriptor: 'SwingerUnion',
+          soft_descriptor: 'DateAstrum',
           amount: {
             currency_code: 'EUR',
             value: isSinglePlan ? SINGLE_PRICE_EUR : MEMBERSHIP_PRICE_EUR,
@@ -213,7 +213,7 @@ export const createOrder = async (
         },
       ],
       application_context: {
-        brand_name: 'SwingerUnion',
+        brand_name: 'DateAstrum',
         shipping_preference: 'NO_SHIPPING',
         user_action: 'PAY_NOW',
         return_url: returnUrl,
@@ -359,3 +359,4 @@ export const captureOrder = async (
     );
   }
 };
+

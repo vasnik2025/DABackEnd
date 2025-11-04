@@ -1,4 +1,4 @@
-import cors from "cors";
+﻿import cors from "cors";
 import { Router } from "express";
 import { proxyExternalImage } from "../controllers/imageProxyController";
 
@@ -6,8 +6,8 @@ const router = Router();
 
 const mediaCors = cors({
   origin: [
-    "https://swingerunion.com",
-    "https://www.swingerunion.com",
+    "https://DateAstrum.com",
+    "https://www.DateAstrum.com",
     "http://localhost:5173",
     "http://localhost:3000",
   ],
@@ -19,3 +19,4 @@ router.options("/proxy", mediaCors, proxyExternalImage);
 router.get("/proxy", mediaCors, proxyExternalImage);
 
 export default router;
+

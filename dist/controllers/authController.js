@@ -26,7 +26,7 @@ const emailService_1 = require("../utils/emailService");
 const passwordShare_1 = require("../utils/passwordShare");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
 const COOKIE_NAME = 'sua';
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://swingerunion.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
 const PASSWORD_RESET_CODE_EXPIRATION_MINUTES = Math.max(1, Number(process.env.PASSWORD_RESET_CODE_EXPIRATION_MINUTES ?? 10));
 const PASSWORD_RESET_LINK_EXPIRATION_MINUTES = Math.max(5, Number(process.env.PASSWORD_RESET_LINK_EXPIRATION_MINUTES ?? 60));
 const MFA_CODE_LENGTH = 6;
@@ -49,7 +49,7 @@ const PRIMARY_SUCCESS_MESSAGES = {
 };
 const PARTNER_SUCCESS_MESSAGES = {
     awaiting: "Your email is confirmed. The primary partner still needs to complete their link before the suite unlocks.",
-    complete: "Both of you are verified. Welcome inside and sign in together to explore SwingerUnion.",
+    complete: "Both of you are verified. Welcome inside and sign in together to explore DateAstrum.",
 };
 async function processVerificationToken(token, expectedType) {
     const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
@@ -623,7 +623,7 @@ async function verifyEmailApi(req, res) {
         console.error('Email verification error:', error);
         const message = error instanceof VerificationError
             ? error.message
-            : 'We couldn�t validate this link. It may be expired or already used.';
+            : 'We couldnοΏ½t validate this link. It may be expired or already used.';
         return res.status(400).json({ message });
     }
 }
@@ -643,7 +643,7 @@ async function verifyPartnerEmailApi(req, res) {
         console.error('Partner email verification error:', error);
         const message = error instanceof VerificationError
             ? error.message
-            : 'We couldn�t validate this link. It may be expired or already used.';
+            : 'We couldnοΏ½t validate this link. It may be expired or already used.';
         return res.status(400).json({ message });
     }
 }

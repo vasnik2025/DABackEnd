@@ -77,7 +77,7 @@ export type InviteVerificationOutcome =
   | { status: 'consumed' }
   | { status: 'invalid' };
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://swingerunion.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
 
 const INVITE_TOKEN_BYTES = 32;
 const TOKEN_SALT_BYTES = 16;
@@ -335,7 +335,7 @@ export async function getInviterEmailContext(userId: string): Promise<InviterEma
   const row = snapshot.recordset?.[0] ?? null;
   if (!row) {
     return {
-      displayName: 'A SwingerUnion couple',
+      displayName: 'A DateAstrum couple',
       primaryEmail: null,
       partnerEmail: null,
     };
@@ -353,7 +353,7 @@ export async function getInviterEmailContext(userId: string): Promise<InviterEma
   } else if (row.Email) {
     displayName = String(row.Email);
   } else {
-    displayName = 'A SwingerUnion couple';
+    displayName = 'A DateAstrum couple';
   }
 
   return {
@@ -2416,6 +2416,7 @@ export function getSinglePlanProductCode(): string {
 export function isActiveStatus(status: string): status is ActiveInviteStatus {
   return ACTIVE_STATUS_SET.has(status);
 }
+
 
 
 

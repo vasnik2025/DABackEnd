@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import PhotoGrid from './components/PhotoGrid';
@@ -793,10 +793,10 @@ export const ProfilePage: React.FC = () => {
         <EmailVerificationModal isOpen={isVerificationModalOpen} onClose={() => setIsVerificationModalOpen(false)} currentUser={currentUser} />
       )}
 
-      <Modal isOpen={isDonationModalOpen} onClose={handleCloseDonationModal} title={donationState === 'form' ? "Support SwingerUnion.com" : "Thank You!"}>
+      <Modal isOpen={isDonationModalOpen} onClose={handleCloseDonationModal} title={donationState === 'form' ? "Support DateAstrum.com" : "Thank You!"}>
         {donationState === 'form' ? (
           <div className="text-center space-y-6 p-4">
-            <img src="/assets/img/SULogo.jpg" alt="SwingerUnion Logo" className="h-24 w-24 mx-auto rounded-full object-cover shadow-lg" />
+            <img src="/assets/img/SULogo.jpg" alt="DateAstrum Logo" className="h-24 w-24 mx-auto rounded-full object-cover shadow-lg" />
             <p className="text-lg text-gray-700 dark:text-gray-200">Your support helps us keep the community running and ad-free.</p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Thank you for your generosity!</p>
             <div className="flex justify-center">
@@ -819,3 +819,4 @@ export const ProfilePage: React.FC = () => {
     </div>
   );
 };
+

@@ -1,4 +1,4 @@
-import type { HelmetOptions } from 'helmet';
+﻿import type { HelmetOptions } from 'helmet';
 
 // Backend only returns JSON, but keep a minimal CSP.
 // (Frontend CSP is controlled by Static Web App config.)
@@ -8,7 +8,7 @@ export const securityHeaders: HelmetOptions = {
     directives: {
       defaultSrc: ["'self'"],
       imgSrc: ["'self'", 'data:', 'blob:'],
-      connectSrc: ["'self'", 'https://api.swingerunion.com'],
+      connectSrc: ["'self'", 'https://api.DateAstrum.com'],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       fontSrc: ["'self'", 'https:', 'data:'],
@@ -20,3 +20,4 @@ export const securityHeaders: HelmetOptions = {
   },
   crossOriginEmbedderPolicy: false,
 };
+

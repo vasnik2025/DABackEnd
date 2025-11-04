@@ -3,15 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.corsOptions = void 0;
 const normalizeOrigin = (value) => value.trim().replace(/\/$/, '').toLowerCase();
 const raw = process.env.ALLOWED_ORIGINS || process.env.CSP_CONNECT_SRC || '';
-// Example value in Azure: "https://swingerunion.com,https://www.swingerunion.com"
+// Example value in Azure: "https://DateAstrum.com,https://www.DateAstrum.com"
 const envAllowList = raw
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
 // Add defaults for when environment variables are not set
 const defaultAllowList = [
-    'https://swingerunion.com',
-    'https://www.swingerunion.com',
+    'https://DateAstrum.com',
+    'https://www.DateAstrum.com',
 ];
 const derivedAllowList = [...new Set([...envAllowList, ...defaultAllowList])]
     .map(normalizeOrigin);
@@ -19,8 +19,8 @@ const isAllowedOrigin = (origin) => {
     const normalized = normalizeOrigin(origin);
     if (derivedAllowList.includes(normalized))
         return true;
-    // Allow any https subdomain of swingerunion.com (e.g., app.swingerunion.com)
-    if (normalized.endsWith('.swingerunion.com'))
+    // Allow any https subdomain of DateAstrum.com (e.g., app.DateAstrum.com)
+    if (normalized.endsWith('.DateAstrum.com'))
         return true;
     return false;
 };

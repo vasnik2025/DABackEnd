@@ -1,4 +1,4 @@
-Changes:
+﻿Changes:
 1) authController.ts
    - Added FRONTEND_URL sanitization (trims trailing slash)
    - Added GET redirect to frontend success pages after verification
@@ -13,5 +13,6 @@ Changes:
    - Registered router.post('/resend-verifications', resendAllVerifications)
 
 Required App Settings:
-   FRONTEND_URL = https://swingerunion.com
-   BACKEND_URL  = https://api.swingerunion.com
+   FRONTEND_URL = https://DateAstrum.com
+   BACKEND_URL  = https://api.DateAstrum.com
+

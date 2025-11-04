@@ -1,4 +1,4 @@
-// FIX: Use `import type` for type-only imports to resolve conflicts.
+﻿// FIX: Use `import type` for type-only imports to resolve conflicts.
 import type { Request, Response } from 'express';
 import { randomInt } from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -39,7 +39,7 @@ import {
 } from '../utils/passwordPolicy';
 
 const COOKIE_NAME = 'sua';
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://swingerunion.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
 
 const PASSWORD_RESET_CODE_EXPIRATION_MINUTES = Math.max(
   1,
@@ -82,7 +82,7 @@ const PARTNER_SUCCESS_MESSAGES: Record<'awaiting' | 'complete', string> = {
   awaiting:
     "Your email is confirmed. The primary partner still needs to complete their link before the suite unlocks.",
   complete:
-    "Both of you are verified. Welcome inside and sign in together to explore SwingerUnion.",
+    "Both of you are verified. Welcome inside and sign in together to explore DateAstrum.",
 };
 async function processVerificationToken(
   token: string,
@@ -767,7 +767,7 @@ export async function verifyEmailApi(req: Request, res: Response) {
         console.error('Email verification error:', error);
         const message = error instanceof VerificationError
             ? error.message
-            : 'We couldn�t validate this link. It may be expired or already used.';
+            : 'We couldnοΏ½t validate this link. It may be expired or already used.';
         return res.status(400).json({ message });
     }
 }
@@ -790,10 +790,11 @@ export async function verifyPartnerEmailApi(req: Request, res: Response) {
         console.error('Partner email verification error:', error);
         const message = error instanceof VerificationError
             ? error.message
-            : 'We couldn�t validate this link. It may be expired or already used.';
+            : 'We couldnοΏ½t validate this link. It may be expired or already used.';
         return res.status(400).json({ message });
     }
 }
+
 
 
 

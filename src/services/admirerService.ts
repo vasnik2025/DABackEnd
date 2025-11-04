@@ -1,4 +1,4 @@
-import { sql, withSqlRetry, getPool } from '../config/db';
+﻿import { sql, withSqlRetry, getPool } from '../config/db';
 import { OperationalError } from '../utils/errorHandler';
 import { sendAdmirerUpdateEmail } from '../utils/emailService';
 
@@ -231,7 +231,7 @@ async function fetchUserDisplayDetails(userId: string | null): Promise<{
   if (!row) return null;
 
   const username = row.DisplayName ?? row.Username ?? 'member';
-  const frontendBase = (process.env.FRONTEND_URL || 'https://swingerunion.com').replace(/\/$/, '');
+  const frontendBase = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
   return {
     username: String(username),
     profileUrl: `${frontendBase}/#/profile`,
@@ -272,3 +272,4 @@ export async function notifyAdmirersOfEvent(userId: string, event: AdmirerNotifi
     console.error('[admirerService] Failed to notify admirers:', error);
   }
 }
+

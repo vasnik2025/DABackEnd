@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+﻿import type { Request, Response, NextFunction } from 'express';
 import type { AuthedRequest } from '../middleware/auth';
 import {
   createReengagementToken,
@@ -11,7 +11,7 @@ import {
 import { OperationalError } from '../utils/errorHandler';
 import { sendReengagementReminderEmail } from '../utils/emailService';
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://swingerunion.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
 
 const buildPreferencesUrl = (token: string): string =>
   `${FRONTEND_URL}/preferences/reengagement?token=${encodeURIComponent(token)}`;
@@ -181,3 +181,4 @@ export async function handleOptOutReengagementPreferences(
     return next(error as Error);
   }
 }
+

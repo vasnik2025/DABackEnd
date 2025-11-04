@@ -9,8 +9,8 @@ const imageProxyController_1 = require("../controllers/imageProxyController");
 const router = (0, express_1.Router)();
 const mediaCors = (0, cors_1.default)({
     origin: [
-        "https://swingerunion.com",
-        "https://www.swingerunion.com",
+        "https://DateAstrum.com",
+        "https://www.DateAstrum.com",
         "http://localhost:5173",
         "http://localhost:3000",
     ],

@@ -4,12 +4,12 @@ exports.proxyExternalImage = proxyExternalImage;
 const promises_1 = require("stream/promises");
 const stream_1 = require("stream");
 const ALLOWED_ORIGINS = new Set([
-    "https://swingerunion.com",
-    "https://www.swingerunion.com",
+    "https://DateAstrum.com",
+    "https://www.DateAstrum.com",
     "http://localhost:5173",
     "http://localhost:3000",
 ]);
-const DEFAULT_ALLOW_ORIGIN = "https://swingerunion.com";
+const DEFAULT_ALLOW_ORIGIN = "https://DateAstrum.com";
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 const MAX_CONTENT_LENGTH = 8 * 1024 * 1024; // 8MB
 const REQUEST_TIMEOUT_MS = 10000;
@@ -89,7 +89,7 @@ async function proxyExternalImage(req, res) {
             redirect: "follow",
             signal: controller.signal,
             headers: {
-                "User-Agent": "SwingerUnionImageProxy/1.0",
+                "User-Agent": "DateAstrumImageProxy/1.0",
                 Accept: "image/*,*/*;q=0.8",
                 "Accept-Language": "en-US,en;q=0.9",
                 Referer: req.headers.referer || DEFAULT_ALLOW_ORIGIN,

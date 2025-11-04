@@ -28,13 +28,13 @@ function isTransientError(error) {
 }
 function getAzureSqlConnectionString() {
     const fromCustom = process.env.AZURE_SQL_CONNECTIONSTRING;
-    const fromSqlNamed = process.env.SQLCONNSTR_swingerunion;
-    const fromCustomNamed = process.env.CUSTOMCONNSTR_swingerunion;
-    const fromColon = process.env.ConnectionStrings__swingerunion;
+    const fromSqlNamed = process.env.SQLCONNSTR_DateAstrum;
+    const fromCustomNamed = process.env.CUSTOMCONNSTR_DateAstrum;
+    const fromColon = process.env.ConnectionStrings__DateAstrum;
     const connectionString = fromCustom || fromSqlNamed || fromCustomNamed || fromColon;
     if (!connectionString) {
         throw new Error('Missing Azure SQL connection string. Set one of: ' +
-            'AZURE_SQL_CONNECTIONSTRING, SQLCONNSTR_swingerunion, CUSTOMCONNSTR_swingerunion, or ConnectionStrings__swingerunion');
+            'AZURE_SQL_CONNECTIONSTRING, SQLCONNSTR_DateAstrum, CUSTOMCONNSTR_DateAstrum, or ConnectionStrings__DateAstrum');
     }
     return connectionString;
 }
