@@ -4,12 +4,12 @@ exports.proxyExternalImage = proxyExternalImage;
 const promises_1 = require("stream/promises");
 const stream_1 = require("stream");
 const ALLOWED_ORIGINS = new Set([
-    "https://DateAstrum.com",
-    "https://www.DateAstrum.com",
+    "https://dateastrum.com",
+    "https://www.dateastrum.com",
     "http://localhost:5173",
     "http://localhost:3000",
 ]);
-const DEFAULT_ALLOW_ORIGIN = "https://DateAstrum.com";
+const DEFAULT_ALLOW_ORIGIN = "https://dateastrum.com";
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 const MAX_CONTENT_LENGTH = 8 * 1024 * 1024; // 8MB
 const REQUEST_TIMEOUT_MS = 10000;

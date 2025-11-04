@@ -8,7 +8,7 @@ exports.handleOptOutReengagementPreferences = handleOptOutReengagementPreference
 const reengagementService_1 = require("../services/reengagementService");
 const errorHandler_1 = require("../utils/errorHandler");
 const emailService_1 = require("../utils/emailService");
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 const buildPreferencesUrl = (token) => `${FRONTEND_URL}/preferences/reengagement?token=${encodeURIComponent(token)}`;
 const LOGIN_URL = `${FRONTEND_URL}/login`;
 async function handleSendReengagementReminders(req, res, next) {

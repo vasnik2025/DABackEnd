@@ -188,7 +188,7 @@ async function fetchUserDisplayDetails(userId) {
     if (!row)
         return null;
     const username = row.DisplayName ?? row.Username ?? 'member';
-    const frontendBase = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+    const frontendBase = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
     return {
         username: String(username),
         profileUrl: `${frontendBase}/#/profile`,

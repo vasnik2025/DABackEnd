@@ -8,7 +8,7 @@ exports.handleOptOutVerificationPreferences = handleOptOutVerificationPreference
 const verificationReminderService_1 = require("../services/verificationReminderService");
 const errorHandler_1 = require("../utils/errorHandler");
 const emailService_1 = require("../utils/emailService");
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 const buildPreferencesUrl = (token) => `${FRONTEND_URL}/preferences/verification?token=${encodeURIComponent(token)}`;
 async function handleSendVerificationReminders(req, res, next) {
     try {

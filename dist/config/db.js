@@ -38,6 +38,18 @@ function getAzureSqlConnectionString() {
     }
     return connectionString;
 }
+function extractDatabaseName(connectionString) {
+    for (const segment of connectionString.split(';')) {
+        const [rawKey, ...rawValueParts] = segment.split('=');
+        if (!rawKey || rawValueParts.length === 0)
+            continue;
+        const key = rawKey.trim().toLowerCase();
+        if (key === 'database' || key === 'initial catalog') {
+            return rawValueParts.join('=').trim() || null;
+        }
+    }
+    return null;
+}
 async function closePool(pool) {
     if (!pool)
         return;
@@ -76,7 +88,8 @@ async function createPool() {
     });
     const connectedPool = await pool.connect();
     connectedPool.requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
-    console.log('Connected to Azure SQL.');
+    const dbName = extractDatabaseName(normalizedConnectionString) ?? 'DateAstrum';
+    console.log(`[database] Connection established to ${dbName} (DateAstrum Azure SQL).`);
     return connectedPool;
 }
 async function getPool() {

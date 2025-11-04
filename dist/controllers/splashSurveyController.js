@@ -5,7 +5,7 @@ const splashSurveyService_1 = require("../services/splashSurveyService");
 const emailService_1 = require("../utils/emailService");
 const errorHandler_1 = require("../utils/errorHandler");
 const CONTACT_NAME = 'DateAstrum Splash Visitor';
-const CONTACT_EMAIL = 'noreply@DateAstrum.com';
+const CONTACT_EMAIL = 'noreply@dateastrum.com';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function extractIpAddress(req) {
     const forwardedFor = req.headers['x-forwarded-for'];

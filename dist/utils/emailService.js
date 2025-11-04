@@ -27,17 +27,17 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const errorHandler_1 = require("./errorHandler");
 let emailClient = null;
 // Senders must be configured as "MailFrom" addresses in your Azure Communication Resource
-const SENDER_INFO = "DoNotReply@DateAstrum.com";
-const SENDER_SUBSCRIPTION = "DoNotReply@DateAstrum.com";
-const SUPPORT_EMAIL = "info@DateAstrum.com";
+const SENDER_INFO = "DoNotReply@dateastrum.com";
+const SENDER_SUBSCRIPTION = "DoNotReply@dateastrum.com";
+const SUPPORT_EMAIL = "info@dateastrum.com";
 // FIX: Changed sender to a valid 'MailFrom' address based on server logs.
-const SENDER_NOTIFICATIONS = "DoNotReply@DateAstrum.com";
+const SENDER_NOTIFICATIONS = "DoNotReply@dateastrum.com";
 const SENDER_SUPPORT = SENDER_NOTIFICATIONS;
-const BACKEND_URL = (process.env.BACKEND_URL || 'https://api.DateAstrum.com').replace(/\/$/, '');
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://DateAstrum.com').replace(/\/$/, '');
+const BACKEND_URL = (process.env.BACKEND_URL || 'https://api.dateastrum.com').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 const BRAND_SIGNATURE_TEXT = `Warm regards,
 The DateAstrum Concierge Team
-https://DateAstrum.com`;
+https://dateastrum.com`;
 const BRAND_TEMPLATE_MARKER = 'data-su-template="DateAstrum"';
 function ensurePlainTextSignature(text) {
     const base = (text ?? '').trimEnd();
@@ -75,13 +75,13 @@ function wrapWithBrandTemplate(html) {
               <tr>
                 <td style="padding:40px;">
                   <div style="text-align:center;margin-bottom:28px;">
-                    <img src="https://DateAstrum.com/assets/img/logo-email.png" alt="DateAstrum" style="height:48px;display:inline-block;" />
+                    <img src="https://dateastrum.com/assets/img/logo-email.png" alt="DateAstrum" style="height:48px;display:inline-block;" />
                   </div>
                   ${bodyBlock}
                   <div style="margin-top:36px;border-top:1px solid #e2e8f0;padding-top:20px;font-size:14px;color:#475569;">
                     Warm regards,<br />
                     <strong>The DateAstrum Concierge Team</strong><br />
-                    <a href="https://DateAstrum.com" style="color:#db2777;text-decoration:none;">https://DateAstrum.com</a>
+                    <a href="https://dateastrum.com" style="color:#db2777;text-decoration:none;">https://dateastrum.com</a>
                   </div>
                 </td>
               </tr>
@@ -803,7 +803,7 @@ Hello,
 
 ${initiatorName} confirmed the permanent deletion of your shared DateAstrum profile. The account and all related content are now being removed from our systems.
 
-If you believe this was a mistake, please contact support immediately at info@DateAstrum.com.
+If you believe this was a mistake, please contact support immediately at info@dateastrum.com.
 
 Thank you,
 The DateAstrum Team
@@ -814,7 +814,7 @@ The DateAstrum Team
       <p>Hello,</p>
       <p><strong>${initiatorName}</strong> confirmed the permanent deletion of your shared DateAstrum profile.</p>
       <p>The account and all related content are now being removed from our systems.</p>
-      <p>If this is unexpected, please reach out to <a href="mailto:info@DateAstrum.com">info@DateAstrum.com</a> immediately.</p>
+      <p>If this is unexpected, please reach out to <a href="mailto:info@dateastrum.com">info@dateastrum.com</a> immediately.</p>
       <p style="margin-top: 30px;">With care,<br/>The DateAstrum Team</p>
     </div>
   `.trim();
@@ -938,7 +938,7 @@ Need a fresh link? You can now resend it yourself:
 - Visit ${resendUrl}
 - Tap "Send them again" beneath the sign-in link
 - Enter both partner emails and we'll deliver any pending links instantly.
-If you still need help, drop us a note at info@DateAstrum.com and we'll step in right away.
+If you still need help, drop us a note at info@dateastrum.com and we'll step in right away.
 
 Log in: ${loginUrl}
 Update reminder preferences: ${preferencesUrl}
@@ -946,7 +946,7 @@ Update reminder preferences: ${preferencesUrl}
     const htmlBody = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.65; color: #0f172a;">
       <div style="text-align:center;margin-bottom:24px;">
-        <img src="https://DateAstrum.com/assets/img/logo-email.png" alt="DateAstrum" style="height:52px;" />
+        <img src="https://dateastrum.com/assets/img/logo-email.png" alt="DateAstrum" style="height:52px;" />
       </div>
       <h1 style="font-size: 26px; margin: 0 0 18px; color: #831843; text-align: center;">Complete your couple verification and keep the magic unlocked ?</h1>
       <p>Hi <strong>${displayName}</strong>,</p>
@@ -973,7 +973,7 @@ Update reminder preferences: ${preferencesUrl}
         </a>
       </p>
       <p style="font-size: 14px; color: #be123c; margin-top: -8px; text-align:center;">Enter both partner emails and we'll deliver any pending links instantly.</p>
-      <p style="text-align:center; margin-top: 18px;">Prefer help from the team? Drop us a note at <a href="mailto:info@DateAstrum.com" style="color:#db2777;">info@DateAstrum.com</a> and we'll take care of it.</p>
+      <p style="text-align:center; margin-top: 18px;">Prefer help from the team? Drop us a note at <a href="mailto:info@dateastrum.com" style="color:#db2777;">info@dateastrum.com</a> and we'll take care of it.</p>
       <p style="text-align: center; margin: 32px 0;">
         <a href="${loginUrl}" style="display: inline-block; padding: 14px 28px; background-color: #0ea5e9; color: #ffffff; text-decoration: none; border-radius: 999px; font-weight: 600; letter-spacing: 0.08em;">
           Log in to verify

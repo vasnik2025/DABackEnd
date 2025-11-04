@@ -45,7 +45,7 @@ const SINGLE_PRICE_EUR = process.env.PAYPAL_SINGLE_PRICE_EUR || '15.00';
 const SINGLE_PURCHASE_DESCRIPTION = process.env.PAYPAL_SINGLE_PURCHASE_DESCRIPTION ||
     '1 Month Single Access Membership for DateAstrum.com';
 const FRONTEND_BASE_URL = resolveEnv('PAYPAL_FRONTEND_BASE_URL', ['FRONTEND_URL', 'PUBLIC_FRONTEND_URL']) ||
-    'https://DateAstrum.com';
+    'https://dateastrum.com';
 const NORMALIZED_FRONTEND_BASE = FRONTEND_BASE_URL.replace(/\/$/, '');
 const DEFAULT_RETURN_URL = resolveEnv('PAYPAL_RETURN_URL', ['PAYPAL_SUCCESS_URL']) ||
     `${NORMALIZED_FRONTEND_BASE}/payments/paypal/return`;

@@ -9,7 +9,7 @@ exports.securityHeaders = {
         directives: {
             defaultSrc: ["'self'"],
             imgSrc: ["'self'", 'data:', 'blob:'],
-            connectSrc: ["'self'", 'https://api.DateAstrum.com'],
+            connectSrc: ["'self'", 'https://api.dateastrum.com'],
             scriptSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             fontSrc: ["'self'", 'https:', 'data:'],

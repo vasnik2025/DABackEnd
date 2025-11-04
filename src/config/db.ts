@@ -38,6 +38,18 @@ function getAzureSqlConnectionString(): string {
   return connectionString;
 }
 
+function extractDatabaseName(connectionString: string): string | null {
+  for (const segment of connectionString.split(';')) {
+    const [rawKey, ...rawValueParts] = segment.split('=');
+    if (!rawKey || rawValueParts.length === 0) continue;
+    const key = rawKey.trim().toLowerCase();
+    if (key === 'database' || key === 'initial catalog') {
+      return rawValueParts.join('=').trim() || null;
+    }
+  }
+  return null;
+}
+
 async function closePool(pool: sql.ConnectionPool | undefined | null) {
   if (!pool) return;
   try {
@@ -76,7 +88,8 @@ async function createPool(): Promise<sql.ConnectionPool> {
 
   const connectedPool = await pool.connect();
   (connectedPool as unknown as { requestTimeout?: number }).requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS;
-  console.log('Connected to Azure SQL.');
+  const dbName = extractDatabaseName(normalizedConnectionString) ?? 'DateAstrum';
+  console.log(`[database] Connection established to ${dbName} (DateAstrum Azure SQL).`);
   return connectedPool;
 }
 

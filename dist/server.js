@@ -21,7 +21,7 @@ async function start() {
     try {
         console.log('[startup] Connecting to database...');
         await (0, db_1.getPool)();
-        console.log('[startup] Database connected.');
+        console.log('[startup] DateAstrum database connected.');
         console.log('[startup] Verifying email service connection...');
         const mailOK = await (0, emailService_1.verifyMailConnections)();
         if (mailOK) {
@@ -34,7 +34,7 @@ async function start() {
         console.log('[startup] Membership maintenance scheduler initialised.');
         (0, fakePresenceRotation_1.scheduleFakePresenceRotation)();
         console.log('[startup] Fake presence rotation scheduler initialised.');
-        app_1.default.listen(PORT, () => console.log(`[startup] API listening on :${PORT}`));
+        app_1.default.listen(PORT, () => console.log(`[startup] DateAstrum API listening on :${PORT}`));
     }
     catch (e) {
         console.error('[startup] Failed to start server:', e);
