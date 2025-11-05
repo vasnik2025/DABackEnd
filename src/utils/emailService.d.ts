@@ -1,4 +1,4 @@
-// Minimal declaration to inform TypeScript about the JS implementation in src/utils/emailService.js
+// Minimal declaration to inform TypeScript about the JS implementation in src/utils/emailService.legacy.js
 // This file declares the module's named exports and default export with loose types (any)
 // to satisfy the compiler until the JS implementation is migrated to TS.
 

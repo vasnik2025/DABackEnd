@@ -235,9 +235,9 @@ export async function sendVerificationEmail(
 // NOTE: For brevity the remaining functions are implemented in the same pattern as above in the original JS.
 // To keep the patch small and focused, we'll re-export the functions from the JS file where the implementation is unchanged.
 
-// Import the compiled JS implementation and re-export named functions to preserve behavior while migrating to TS.
+// Import the legacy JS implementation and re-export named functions to preserve behavior while migrating to TS.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const jsImpl = require('./emailService.js');
+const jsImpl = require('./emailService.legacy.js');
 
 export const sendPartnerVerificationEmail = jsImpl.sendPartnerVerificationEmail || jsImpl.default?.sendPartnerVerificationEmail;
 export const sendPhotoShareRequestEmail = jsImpl.sendPhotoShareRequestEmail || jsImpl.default?.sendPhotoShareRequestEmail;
