@@ -133,7 +133,12 @@ async function register(req, res) {
             catch (profileError) {
                 console.error('[auth/register] Failed to upsert single profile', profileError);
             }
-            await (0, emailService_1.sendVerificationEmail)(singleUser.id, normalizedEmail);
+            try {
+                await (0, emailService_1.sendVerificationEmail)(singleUser.id, normalizedEmail);
+            }
+            catch (verificationError) {
+                console.error('[auth/register] Failed to send verification email for single account', verificationError);
+            }
             try {
                 await (0, emailService_1.sendAdminNewMemberNotificationEmail)({
                     accountType: 'single',
@@ -201,9 +206,19 @@ async function register(req, res) {
             }
         }
         // Send verification emails
-        await (0, emailService_1.sendVerificationEmail)(user.id, normalizedEmail);
+        try {
+            await (0, emailService_1.sendVerificationEmail)(user.id, normalizedEmail);
+        }
+        catch (verificationError) {
+            console.error('[auth/register] Failed to send primary verification email for couple account', verificationError);
+        }
         if (normalizedPartnerEmail) {
-            await (0, emailService_1.sendPartnerVerificationEmail)(user.id, normalizedPartnerEmail, trimmedUsername);
+            try {
+                await (0, emailService_1.sendPartnerVerificationEmail)(user.id, normalizedPartnerEmail, trimmedUsername);
+            }
+            catch (verificationError) {
+                console.error('[auth/register] Failed to send partner verification email for couple account', verificationError);
+            }
         }
         try {
             await (0, emailService_1.sendAdminNewMemberNotificationEmail)({

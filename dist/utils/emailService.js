@@ -114,9 +114,10 @@ async function verifyMailConnections() {
 async function sendEmail(message) {
     const client = emailClient ?? (await initEmailClient());
     if (!client) {
-        const toList = message.recipients?.to?.map((r) => r.address).join(', ');
-        console.info(`[emailService] sendEmail skipped (no client) to: ${toList}`);
-        throw new errorHandler_1.OperationalError('Email service is not available.', 503);
+        const toList = message.recipients?.to?.map((r) => r.address).join(', ') ?? 'unknown recipients';
+        // Gracefully degrade when ACS is not configured or temporarily unavailable.
+        console.warn(`[emailService] sendEmail skipped because no client is available. Intended recipients: ${toList}`);
+        return;
     }
     if (message.content) {
         if (message.content.html)
