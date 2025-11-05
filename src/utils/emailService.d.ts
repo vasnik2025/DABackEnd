@@ -7,7 +7,16 @@ export function verifyMailConnections(): Promise<boolean>;
 export function sendContactFormEmail(...args: any[]): Promise<void>;
 export function sendSubscriptionConfirmationEmail(...args: any[]): Promise<void>;
 export function sendPlatinumExpiryReminderEmail(...args: any[]): Promise<void>;
-export function sendVerificationEmail(...args: any[]): Promise<void>;
+export type VerificationEmailResult = {
+    userId: string;
+    email: string;
+    token: string;
+    emailSent: boolean;
+    backendLink: string;
+    frontendLink: string;
+};
+
+export function sendVerificationEmail(userId: string, email: string): Promise<VerificationEmailResult>;
 export function sendPartnerVerificationEmail(...args: any[]): Promise<void>;
 export function sendPhotoShareRequestEmail(...args: any[]): Promise<void>;
 export function sendAccountDeletionCodeEmail(...args: any[]): Promise<void>;

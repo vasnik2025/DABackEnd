@@ -28,6 +28,8 @@ const passwordShare_1 = require("../utils/passwordShare");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
 const COOKIE_NAME = 'sua';
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
+const shouldExposeVerificationTokens = () => (process.env.EXPOSE_VERIFICATION_TOKENS ?? '').toLowerCase() === 'true' ||
+    (process.env.NODE_ENV ?? '').toLowerCase() === 'development';
 const PASSWORD_RESET_CODE_EXPIRATION_MINUTES = Math.max(1, Number(process.env.PASSWORD_RESET_CODE_EXPIRATION_MINUTES ?? 10));
 const PASSWORD_RESET_LINK_EXPIRATION_MINUTES = Math.max(5, Number(process.env.PASSWORD_RESET_LINK_EXPIRATION_MINUTES ?? 60));
 const MFA_CODE_LENGTH = 6;
@@ -117,6 +119,8 @@ async function register(req, res) {
                 passwordHash: hash,
                 username: trimmedUsername,
             });
+            const manualVerificationHints = [];
+            const exposeVerificationTokens = shouldExposeVerificationTokens();
             try {
                 await (0, singleMemberService_1.upsertSingleProfile)(singleUser.id, null, {
                     preferredNickname: trimmedPartner1Nickname,
@@ -133,11 +137,22 @@ async function register(req, res) {
             catch (profileError) {
                 console.error('[auth/register] Failed to upsert single profile', profileError);
             }
+            let singleVerification = null;
             try {
-                await (0, emailService_1.sendVerificationEmail)(singleUser.id, normalizedEmail);
+                singleVerification = await (0, emailService_1.sendVerificationEmail)(singleUser.id, normalizedEmail);
             }
             catch (verificationError) {
                 console.error('[auth/register] Failed to send verification email for single account', verificationError);
+            }
+            if (singleVerification && !singleVerification.emailSent) {
+                console.warn(`[auth/register] Verification email not automatically delivered for single account ${singleUser.id}. Manual link: ${singleVerification.frontendLink}`);
+                manualVerificationHints.push({
+                    type: 'primary',
+                    email: normalizedEmail,
+                    frontendUrl: singleVerification.frontendLink,
+                    backendUrl: singleVerification.backendLink,
+                    token: singleVerification.token,
+                });
             }
             try {
                 await (0, emailService_1.sendAdminNewMemberNotificationEmail)({
@@ -152,9 +167,17 @@ async function register(req, res) {
             catch (notifyError) {
                 console.error('[auth/register] Failed to notify admin about new single registration', notifyError);
             }
-            return res.status(201).json({
+            const responsePayload = {
                 message: 'Registration successful! Please check your email to verify your account.',
-            });
+            };
+            if (singleVerification && !singleVerification.emailSent) {
+                responsePayload.message =
+                    'Registration successful. Verification email delivery failed; please use the manual link or try again later.';
+            }
+            if (manualVerificationHints.length && exposeVerificationTokens) {
+                responsePayload.manualVerification = manualVerificationHints;
+            }
+            return res.status(201).json(responsePayload);
         }
         const exists = existingByEmail;
         if (exists)
@@ -176,6 +199,8 @@ async function register(req, res) {
             partner2Nickname: trimmedPartner2Nickname,
         };
         const user = await (0, userService_1.createUser)(userPayload);
+        const manualVerificationHints = [];
+        const exposeVerificationTokens = shouldExposeVerificationTokens();
         let countryRecipientList = [];
         if (trimmedCountry) {
             try {
@@ -206,11 +231,22 @@ async function register(req, res) {
             }
         }
         // Send verification emails
+        let primaryVerification = null;
         try {
-            await (0, emailService_1.sendVerificationEmail)(user.id, normalizedEmail);
+            primaryVerification = await (0, emailService_1.sendVerificationEmail)(user.id, normalizedEmail);
         }
         catch (verificationError) {
             console.error('[auth/register] Failed to send primary verification email for couple account', verificationError);
+        }
+        if (primaryVerification && !primaryVerification.emailSent) {
+            console.warn(`[auth/register] Primary verification email not automatically delivered for couple account ${user.id}. Manual link: ${primaryVerification.frontendLink}`);
+            manualVerificationHints.push({
+                type: 'primary',
+                email: normalizedEmail,
+                frontendUrl: primaryVerification.frontendLink,
+                backendUrl: primaryVerification.backendLink,
+                token: primaryVerification.token,
+            });
         }
         if (normalizedPartnerEmail) {
             try {
@@ -236,7 +272,17 @@ async function register(req, res) {
         catch (notifyError) {
             console.error('[auth/register] Failed to notify admin about new couple registration', notifyError);
         }
-        return res.status(201).json({ message: 'Registration successful! Please check your and your partner\'s email inboxes to verify your account.' });
+        const responsePayload = {
+            message: "Registration successful! Please check your and your partner's email inboxes to verify your account.",
+        };
+        if (primaryVerification && !primaryVerification.emailSent) {
+            responsePayload.message =
+                'Registration successful. Verification email delivery failed; please use the manual link or try again later.';
+        }
+        if (manualVerificationHints.length && exposeVerificationTokens) {
+            responsePayload.manualVerification = manualVerificationHints;
+        }
+        return res.status(201).json(responsePayload);
     }
     catch (e) {
         console.error('[auth/register]', e);
@@ -277,12 +323,39 @@ async function resendVerificationEmails(req, res) {
             account.partner1Nickname ??
             account.partner2Nickname ??
             maskEmailAddress(account.primaryEmail);
+        const exposeVerificationTokens = shouldExposeVerificationTokens();
+        const manualVerificationHints = [];
+        const failedRecipients = [];
         for (const target of pendingTargets) {
             if (target.type === 'primary') {
-                await (0, emailService_1.sendVerificationEmail)(account.id, target.email);
+                let verificationResult = null;
+                try {
+                    verificationResult = await (0, emailService_1.sendVerificationEmail)(account.id, target.email);
+                }
+                catch (verificationError) {
+                    console.error('[auth/resend-verification] Failed to send primary verification email', verificationError);
+                }
+                if (!verificationResult || !verificationResult.emailSent) {
+                    failedRecipients.push({ type: 'primary', email: target.email, reason: 'email_service_unavailable' });
+                    if (verificationResult && exposeVerificationTokens) {
+                        manualVerificationHints.push({
+                            type: 'primary',
+                            email: target.email,
+                            frontendUrl: verificationResult.frontendLink,
+                            backendUrl: verificationResult.backendLink,
+                            token: verificationResult.token,
+                        });
+                    }
+                }
             }
             else {
-                await (0, emailService_1.sendPartnerVerificationEmail)(account.id, target.email, partnerDisplayName);
+                try {
+                    await (0, emailService_1.sendPartnerVerificationEmail)(account.id, target.email, partnerDisplayName);
+                }
+                catch (verificationError) {
+                    console.error('[auth/resend-verification] Failed to send partner verification email', verificationError);
+                    failedRecipients.push({ type: 'partner', email: target.email, reason: 'email_service_unavailable' });
+                }
             }
         }
         const maskedRecipients = pendingTargets.map((target) => maskEmailAddress(target.email));
@@ -293,10 +366,29 @@ async function resendVerificationEmails(req, res) {
                     ? 'We just re-sent the verification email to your address.'
                     : "We just re-sent the verification email to your partner.";
         }
-        return res.status(200).json({
+        const responsePayload = {
             message,
             sentTo: maskedRecipients,
-        });
+        };
+        if (failedRecipients.length) {
+            responsePayload.message =
+                failedRecipients.length === pendingTargets.length
+                    ? 'We could not deliver the verification emails. Please use the manual link or try again later.'
+                    : 'We re-sent your verification links, but a few could not be delivered.';
+            responsePayload.undelivered = failedRecipients.map((entry) => ({
+                type: entry.type,
+                email: maskEmailAddress(entry.email),
+                reason: entry.reason,
+            }));
+            if (manualVerificationHints.length && exposeVerificationTokens) {
+                responsePayload.manualVerification = manualVerificationHints;
+            }
+            return res.status(202).json(responsePayload);
+        }
+        if (manualVerificationHints.length && exposeVerificationTokens) {
+            responsePayload.manualVerification = manualVerificationHints;
+        }
+        return res.status(200).json(responsePayload);
     }
     catch (error) {
         console.error('[auth/resend-verification]', error);

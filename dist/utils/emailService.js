@@ -117,7 +117,7 @@ async function sendEmail(message) {
         const toList = message.recipients?.to?.map((r) => r.address).join(', ') ?? 'unknown recipients';
         // Gracefully degrade when ACS is not configured or temporarily unavailable.
         console.warn(`[emailService] sendEmail skipped because no client is available. Intended recipients: ${toList}`);
-        return;
+        return false;
     }
     if (message.content) {
         if (message.content.html)
@@ -138,7 +138,7 @@ async function sendEmail(message) {
                 if (result.status === 'Succeeded') {
                     const toList = message.recipients?.to?.map((r) => r.address).join(', ');
                     console.log(`[emailService] Email sent successfully via ACS to ${toList}`);
-                    return;
+                    return true;
                 }
                 console.error('[emailService] ACS email send failed.', result);
                 const errorDetails = result.error?.message || JSON.stringify(result.error);
@@ -159,12 +159,14 @@ async function sendEmail(message) {
         console.error('[emailService] Error sending email via ACS:', e);
         const messageText = String(e?.message ?? '');
         if (messageText.includes('EmailDroppedAllRecipientsSuppressed')) {
-            const suppressedList = message.recipients?.to?.map((recipient) => recipient.address).join(', ') ?? 'unknown recipients';
+            const suppressedList = message.recipients?.to?.map((recipient) => recipient.address).join(', ') ??
+                'unknown recipients';
             console.warn(`[emailService] ACS dropped email because all recipients were suppressed. Skipping send. Recipients: ${suppressedList}`);
-            return;
+            return false;
         }
         throw new errorHandler_1.OperationalError(messageText || 'An unexpected error occurred while sending the email.', 500);
     }
+    return false;
 }
 async function sendContactFormEmail(arg1, arg2, arg3, arg4) {
     let name, email, subject, message;
@@ -233,7 +235,24 @@ async function sendVerificationEmail(userId, email) {
     const plainTextContent = `Hello,\n\nThank you for registering. Please verify your email by clicking the link below:\n${verificationLink}\n\nIf you did not create an account, please ignore this email.\n\nFor convenience, you can also use this link: ${frontendLink}`;
     const htmlContent = `<h3>Welcome to DateAstrum.com!</h3><p>Please verify your email address by clicking the button below:</p><a href="${frontendLink}" style="background-color:#db2777;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Verify Email</a><p>If you did not create an account, please ignore this email.</p>`;
     const message = { senderAddress: SENDER_VERIFICATION, recipients: { to: [{ address: email }] }, content: { subject, plainText: plainTextContent, html: htmlContent } };
-    await sendEmail(message);
+    let emailSent = false;
+    try {
+        emailSent = await sendEmail(message);
+    }
+    catch (error) {
+        console.error('[emailService] Failed to send verification email via ACS', error);
+    }
+    if (!emailSent) {
+        console.warn(`[emailService] Verification email not sent automatically. Manual link: ${frontendLink}`);
+    }
+    return {
+        userId,
+        email,
+        token,
+        emailSent,
+        backendLink: verificationLink,
+        frontendLink,
+    };
 }
 // NOTE: For brevity the remaining functions are implemented in the same pattern as above in the original JS.
 // To keep the patch small and focused, we'll re-export the functions from the JS file where the implementation is unchanged.
