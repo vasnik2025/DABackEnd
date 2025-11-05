@@ -12,7 +12,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
-import { corsOptions } from './config/cors';
+import { corsOptions, isCorsOriginAllowed } from './config/cors';
 import routes from './routes';
 import { handleWebhook as handlePaypalWebhook } from './controllers/paypalWebhookController';
 
@@ -64,6 +64,13 @@ app.use(helmet({
 
 // CORS (only Azure allowlist)
 app.use(cors(corsOptions));
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  if (origin && isCorsOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
 
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '20mb';
 const PAYPAL_WEBHOOK_PATH = '/api/paypal/webhook';

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.corsOptions = void 0;
+exports.corsOptions = exports.isCorsOriginAllowed = void 0;
 const normalizeOrigin = (value) => value.trim().replace(/\/$/, '').toLowerCase();
 const raw = process.env.ALLOWED_ORIGINS || process.env.CSP_CONNECT_SRC || '';
 // Example value in Azure: "https://dateastrum.com,https://www.dateastrum.com"
@@ -15,7 +15,7 @@ const defaultAllowList = [
 ];
 const derivedAllowList = [...new Set([...envAllowList, ...defaultAllowList])]
     .map(normalizeOrigin);
-const isAllowedOrigin = (origin) => {
+const isCorsOriginAllowed = (origin) => {
     const normalized = normalizeOrigin(origin);
     if (derivedAllowList.includes(normalized))
         return true;
@@ -24,12 +24,13 @@ const isAllowedOrigin = (origin) => {
         return true;
     return false;
 };
+exports.isCorsOriginAllowed = isCorsOriginAllowed;
 exports.corsOptions = {
     origin: (origin, cb) => {
         // allow server-to-server and same-origin tools
         if (!origin)
             return cb(null, true);
-        if (isAllowedOrigin(origin))
+        if ((0, exports.isCorsOriginAllowed)(origin))
             return cb(null, true);
         cb(new Error(`Not allowed by CORS: ${origin}`));
     },

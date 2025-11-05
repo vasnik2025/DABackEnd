@@ -56,6 +56,13 @@ app.use((0, helmet_1.default)({
 }));
 // CORS (only Azure allowlist)
 app.use((0, cors_1.default)(cors_2.corsOptions));
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (0, cors_2.isCorsOriginAllowed)(origin)) {
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    next();
+});
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '20mb';
 const PAYPAL_WEBHOOK_PATH = '/api/paypal/webhook';
 const jsonParser = express_1.default.json({ limit: JSON_BODY_LIMIT });

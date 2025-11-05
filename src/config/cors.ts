@@ -19,7 +19,7 @@ const defaultAllowList = [
 const derivedAllowList = [...new Set([...envAllowList, ...defaultAllowList])]
   .map(normalizeOrigin);
 
-const isAllowedOrigin = (origin: string): boolean => {
+export const isCorsOriginAllowed = (origin: string): boolean => {
   const normalized = normalizeOrigin(origin);
   if (derivedAllowList.includes(normalized)) return true;
 
@@ -33,7 +33,7 @@ export const corsOptions: CorsOptions = {
   origin: (origin, cb) => {
     // allow server-to-server and same-origin tools
     if (!origin) return cb(null, true);
-    if (isAllowedOrigin(origin)) return cb(null, true);
+    if (isCorsOriginAllowed(origin)) return cb(null, true);
     cb(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true,
