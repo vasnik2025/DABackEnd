@@ -33,6 +33,19 @@ const SUPPORT_EMAIL = "info@dateastrum.com";
 // FIX: Changed sender to a valid 'MailFrom' address based on server logs.
 const SENDER_NOTIFICATIONS = "DoNotReply@dateastrum.com";
 const SENDER_SUPPORT = SENDER_NOTIFICATIONS;
+const SENDER_VERIFICATION = "MailVerification@dateastrum.con";
+const DEFAULT_ACS_CONNECTION_STRING = "endpoint=https://dateastrumms.germany.communication.azure.com/;accesskey=3FwJXB8sYKCkOI2bLFc6jjozcLoHObTpbVhZDpALhutnctTGdwqhJQQJ99BKACULyCpcK8IFAAAAAZCSP0Pd";
+const rawConnectionString = process.env.COMMUNICATION_SERVICES_CONNECTION_STRING;
+const ACS_CONNECTION_STRING = rawConnectionString && rawConnectionString.trim().length > 0
+    ? rawConnectionString.trim()
+    : DEFAULT_ACS_CONNECTION_STRING;
+if (!rawConnectionString || rawConnectionString.trim().length === 0) {
+    process.env.COMMUNICATION_SERVICES_CONNECTION_STRING = ACS_CONNECTION_STRING;
+}
+const ACS_ENDPOINT = (() => {
+    const endpointPart = ACS_CONNECTION_STRING.split(';').find((part) => part.toLowerCase().startsWith('endpoint='));
+    return endpointPart ? endpointPart.slice(endpointPart.indexOf('=') + 1) : 'unknown-endpoint';
+})();
 const BACKEND_URL = (process.env.BACKEND_URL || 'https://api.dateastrum.com').replace(/\/$/, '');
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://dateastrum.com').replace(/\/$/, '');
 const BRAND_SIGNATURE_TEXT = `Warm regards,
@@ -87,7 +100,7 @@ function wrapWithBrandTemplate(html) {
               </tr>
             </table>
             <div style="margin-top:24px;font-size:12px;color:#64748b;">
-              © ${new Date().getFullYear()} DateAstrum. All rights reserved.
+              � ${new Date().getFullYear()} DateAstrum. All rights reserved.
             </div>
           </td>
         </tr>
@@ -96,16 +109,17 @@ function wrapWithBrandTemplate(html) {
   </html>`;
 }
 function acsEnabled() {
-    return Boolean(process.env.COMMUNICATION_SERVICES_CONNECTION_STRING);
+    return ACS_CONNECTION_STRING.length > 0;
 }
 async function initEmailClient() {
     if (!acsEnabled()) {
-        console.warn('[emailService] Azure Communication Services not configured â€” email sending is disabled.');
+        console.warn('[emailService] Azure Communication Services not configured � email sending is disabled.');
         emailClient = null;
         return null;
     }
     try {
-        emailClient = new communication_email_1.EmailClient(process.env.COMMUNICATION_SERVICES_CONNECTION_STRING);
+        emailClient = new communication_email_1.EmailClient(ACS_CONNECTION_STRING);
+        console.info(`[emailService] Azure Communication Services email client connected (endpoint: ${ACS_ENDPOINT}).`);
         return emailClient;
     }
     catch (e) {
@@ -208,7 +222,7 @@ async function sendContactFormEmail(arg1, arg2, arg3, arg4) {
 }
 async function sendSubscriptionConfirmationEmail(to, details) {
     const subject = 'Your subscription is active';
-    const lines = ['Thanks for subscribing â€” your membership is now active.'];
+    const lines = ['Thanks for subscribing — your membership is now active.'];
     if (details?.planName)
         lines.push(`Plan: ${details.planName}`);
     if (details?.price)
@@ -249,7 +263,7 @@ async function sendPlatinumExpiryReminderEmail(recipients, payload) {
 Hello lovers,
 
 This is a friendly reminder that your DateAstrum Platinum membership will expire on ${expiryText}.
-Renew within the next 5 days to keep every premium perk for just €2.
+Renew within the next 5 days to keep every premium perk for just �2.
 
 If you let it lapse, the account will automatically return to the Free tier and Platinum-only features will disappear.
 
@@ -263,7 +277,7 @@ The DateAstrum Team
       <h2 style="color:#db2777;">Your Platinum perks are about to lapse</h2>
       <p>Hello lovers,</p>
       <p>Your DateAstrum Platinum membership is due to expire on <strong>${expiryText}</strong>.</p>
-      <p>Renew within the next 5 days to keep your premium tools for just <strong>€2</strong>. After the expiry date we will automatically switch your account back to the Free tier and all Platinum-only features will disappear.</p>
+      <p>Renew within the next 5 days to keep your premium tools for just <strong>�2</strong>. After the expiry date we will automatically switch your account back to the Free tier and all Platinum-only features will disappear.</p>
       <p style="margin-top: 24px;">
         Open the <strong>Settings ? Membership</strong> section inside DateAstrum to renew in a few taps.
       </p>
@@ -287,7 +301,7 @@ async function sendVerificationEmail(userId, email) {
     const plainTextContent = `Hello,\n\nThank you for registering. Please verify your email by clicking the link below:\n${verificationLink}\n\nIf you did not create an account, please ignore this email.\n\nFor convenience, you can also use this link: ${frontendLink}`;
     const htmlContent = `<h3>Welcome to DateAstrum.com!</h3><p>Please verify your email address by clicking the button below:</p><a href="${frontendLink}" style="background-color:#db2777;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Verify Email</a><p>If you did not create an account, please ignore this email.</p>`;
     const message = {
-        senderAddress: SENDER_INFO,
+        senderAddress: SENDER_VERIFICATION,
         recipients: { to: [{ address: email }] },
         content: { subject, plainText: plainTextContent, html: htmlContent }
     };
@@ -301,7 +315,7 @@ async function sendPartnerVerificationEmail(userId, partnerEmail, primaryUsernam
     const plainTextContent = `Hello,\n\nYour partner, ${primaryUsername}, created a couple's account and listed you as their partner. To activate the account, please verify by clicking the link below:\n${verificationLink}\n\nIf you did not agree to this, please ignore this email.\n\nFor convenience, you can also use this link: ${frontendLink}`;
     const htmlContent = `<h3>Welcome to DateAstrum.com!</h3><p>Your partner, <strong>${primaryUsername}</strong>, has created a couple's account and listed you as their partner.</p><p>To activate the account, please verify by clicking the button below:</p><a href="${frontendLink}" style="background-color:#db2777;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Verify Partner Email</a><p>If you did not agree to this, please ignore this email.</p>`;
     const message = {
-        senderAddress: SENDER_INFO,
+        senderAddress: SENDER_VERIFICATION,
         recipients: { to: [{ address: partnerEmail }] },
         content: { subject, plainText: plainTextContent, html: htmlContent }
     };
@@ -695,7 +709,7 @@ ${actorName} just shared ${description} on DateAstrum.com.
 
 Because you're on their Admirers list, you're the first to know.
 
-See whatâ€™s new: ${profileUrl}
+See what’s new: ${profileUrl}
 
 With excitement,
 The DateAstrum.com Team
@@ -876,7 +890,7 @@ Prefer fewer reminders? Update your preferences: ${preferencesUrl}
         Couples like you bring the warmth, curiosity, and connection that keep our community thriving.
       </p>
       <div style="background: linear-gradient(135deg, rgba(252, 211, 77, 0.25), rgba(249, 112, 167, 0.3)); padding: 18px 20px; border-radius: 16px; margin: 28px 0;">
-        <p style="margin: 0 0 14px;">Here’s what’s waiting the moment you log back in:</p>
+        <p style="margin: 0 0 14px;">Here�s what�s waiting the moment you log back in:</p>
         <ul style="margin: 0; padding-left: 20px;">
           <li>Fresh profiles curated for adventurous couples</li>
           <li>Invitations to exclusive events and member-hosted evenings</li>
@@ -905,7 +919,7 @@ Prefer fewer reminders? Update your preferences: ${preferencesUrl}
     </div>
   `;
     const message = {
-        senderAddress: SENDER_NOTIFICATIONS,
+        senderAddress: SENDER_VERIFICATION,
         recipients: { to: uniqueRecipients.map((address) => ({ address })) },
         content: {
             subject,
@@ -937,7 +951,7 @@ async function sendVerificationReminderEmail(params) {
     const plainTextContent = ensurePlainTextSignature(`
 Hi ${displayName},
 
-Thanks for building your profile with us! We noticed we’re still waiting on one (or both) of your email verifications. Once both partners confirm, you’ll unlock:
+Thanks for building your profile with us! We noticed we�re still waiting on one (or both) of your email verifications. Once both partners confirm, you�ll unlock:
 
 - Priority placement in searches and invites
 - Access to our full couples directory and rendezvous board
@@ -964,7 +978,7 @@ Update reminder preferences: ${preferencesUrl}
       </div>
       <h1 style="font-size: 26px; margin: 0 0 18px; color: #831843; text-align: center;">Complete your couple verification and keep the magic unlocked ?</h1>
       <p>Hi <strong>${displayName}</strong>,</p>
-      <p>Thanks for building your profile with us! We noticed we’re still waiting on one (or both) of your email verifications. Once both partners confirm, you’ll unlock:</p>
+      <p>Thanks for building your profile with us! We noticed we�re still waiting on one (or both) of your email verifications. Once both partners confirm, you�ll unlock:</p>
       <ul style="margin: 16px 0; padding-left: 22px;">
         <li>Priority placement in searches and invites</li>
         <li>Access to our full couples directory and rendezvous board</li>
@@ -993,7 +1007,7 @@ Update reminder preferences: ${preferencesUrl}
           Log in to verify
         </a>
       </p>
-      <p>Let’s get your duo officially verified so you can explore without limits.</p>
+      <p>Let�s get your duo officially verified so you can explore without limits.</p>
       <p style="margin-top: 28px;">Warmly,<br/>The DateAstrum Team</p>
       <div style="margin-top: 36px; text-align: center;">
         <a href="${preferencesUrl}" style="font-size: 13px; color: #be123c; text-decoration: none;">
@@ -1016,7 +1030,7 @@ Update reminder preferences: ${preferencesUrl}
 async function sendFakeEngagementAlertEmail(payload) {
     const trimmedPreview = (payload.messagePreview ?? '').trim();
     const previewNormalized = trimmedPreview.replace(/\s+/g, ' ');
-    const preview = previewNormalized.length > 500 ? `${previewNormalized.slice(0, 497)}…` : previewNormalized;
+    const preview = previewNormalized.length > 500 ? `${previewNormalized.slice(0, 497)}�` : previewNormalized;
     const senderDescriptor = payload.senderUsername?.trim().length
         ? `${payload.senderUsername?.trim()} (ID: ${payload.senderUserId})`
         : `User ${payload.senderUserId}`;
