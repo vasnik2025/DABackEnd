@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.usersTableSupportsZodiacSign = usersTableSupportsZodiacSign;
 exports.findUserByEmail = findUserByEmail;
 exports.findUserByUsernameOrEmail = findUserByUsernameOrEmail;
 exports.findCoupleByEmails = findCoupleByEmails;
@@ -11,8 +12,29 @@ exports.setUserEmailVerified = setUserEmailVerified;
 exports.setPartnerEmailVerified = setPartnerEmailVerified;
 exports.getUserVerificationStatus = getUserVerificationStatus;
 const db_1 = require("../config/db");
+let cachedUsersTableSupportsZodiacSign = null;
+async function usersTableSupportsZodiacSign(pool) {
+    if (cachedUsersTableSupportsZodiacSign !== null) {
+        return cachedUsersTableSupportsZodiacSign;
+    }
+    const activePool = pool ?? (await (0, db_1.getPool)());
+    const result = await activePool
+        .request()
+        .query(`
+      SELECT 1 AS HasColumn
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo'
+        AND TABLE_NAME = 'Users'
+        AND COLUMN_NAME = 'ZodiacSign'
+    `);
+    cachedUsersTableSupportsZodiacSign = Boolean(result.recordset?.length);
+    return cachedUsersTableSupportsZodiacSign;
+}
+const nullZodiacSelect = 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
 async function findUserByEmail(email) {
     const pool = await (0, db_1.getPool)();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const zodiacSelect = supportsZodiac ? 'ZodiacSign AS zodiacSign,' : nullZodiacSelect;
     const normalized = email.toLowerCase();
     const couple = await pool
         .request()
@@ -27,7 +49,7 @@ async function findUserByEmail(email) {
         Partner2Nickname AS partner2Nickname,
         CoupleType AS coupleType,
         AccountKind AS accountKind,
-        ZodiacSign AS zodiacSign,
+        ${zodiacSelect}
         PasswordHash AS passwordHash,
         ISNULL(IsEmailVerified, 0) AS isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) AS isPartnerEmailVerified
@@ -91,6 +113,8 @@ async function findUserByEmail(email) {
 }
 async function findUserByUsernameOrEmail(usernameOrEmail) {
     const pool = await (0, db_1.getPool)();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const zodiacSelect = supportsZodiac ? 'ZodiacSign AS zodiacSign,' : nullZodiacSelect;
     const normalized = usernameOrEmail.toLowerCase();
     const res = await pool
         .request()
@@ -105,7 +129,7 @@ async function findUserByUsernameOrEmail(usernameOrEmail) {
         Partner2Nickname AS partner2Nickname,
         CoupleType AS coupleType,
         AccountKind AS accountKind,
-        ZodiacSign AS zodiacSign,
+        ${zodiacSelect}
         PasswordHash AS passwordHash,
         ISNULL(IsEmailVerified, 0) as isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) as isPartnerEmailVerified

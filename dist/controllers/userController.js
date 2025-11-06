@@ -22,6 +22,7 @@ const passwordShare_1 = require("../utils/passwordShare");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
 const admirerService_1 = require("../services/admirerService");
 const accountDeletionService_1 = require("../services/accountDeletionService");
+const userService_1 = require("../services/userService");
 const ALLOWED_FAVORITE_COLUMNS = ['FavoriteUserID', 'FavoriteID'];
 const ACCOUNT_DELETION_CODE_LENGTH = 6;
 const ACCOUNT_DELETION_CODE_EXPIRY_MINUTES = 30;
@@ -72,6 +73,8 @@ async function ensureUserFavoritesStructure(pool) {
     };
 }
 const loadBasicUserInfo = async (userId) => {
+    const supportsZodiac = await (0, userService_1.usersTableSupportsZodiacSign)();
+    const zodiacSelect = supportsZodiac ? 'ZodiacSign' : 'CAST(NULL AS NVARCHAR(64)) AS ZodiacSign';
     const coupleResult = await (0, db_1.withSqlRetry)((pool) => pool
         .request()
         .input('UserID', db_1.sql.VarChar(255), userId)
@@ -83,7 +86,7 @@ const loadBasicUserInfo = async (userId) => {
           PartnerEmail,
           Partner1Nickname,
           Partner2Nickname,
-          ZodiacSign
+          ${zodiacSelect}
         FROM dbo.Users
         WHERE UserID = @UserID;
       `));
@@ -143,6 +146,10 @@ async function getAllUsers(req, res, next) {
     const { currentUserId } = req.query;
     try {
         const pool = await (0, db_1.getPool)();
+        const supportsZodiac = await (0, userService_1.usersTableSupportsZodiacSign)(pool);
+        const usersZodiacSelect = supportsZodiac
+            ? 'Users.ZodiacSign as zodiacSign,'
+            : 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
         const request = pool.request();
         const conditions = [
             '(fake.FakeUserID IS NULL OR ISNULL(fake.IsActive, 0) = 1)',
@@ -188,7 +195,7 @@ async function getAllUsers(req, res, next) {
              Users.IsOnline as isOnline,
              Users.City as city,
              Users.Country as country,
-             Users.ZodiacSign as zodiacSign,
+             ${usersZodiacSelect}
              Users.IsEmailVerified as isEmailVerified,
              Users.CoupleType as coupleType,
              Users.PartnerEmail as partnerEmail,
@@ -221,6 +228,10 @@ async function getUserById(req, res, next) {
     const { userId } = req.params;
     try {
         const pool = await (0, db_1.getPool)();
+        const supportsZodiac = await (0, userService_1.usersTableSupportsZodiacSign)(pool);
+        const usersZodiacSelect = supportsZodiac
+            ? 'Users.ZodiacSign as zodiacSign,'
+            : 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
         const result = await pool.request()
             .input('UserID', db_1.sql.VarChar(255), userId)
             .query(`
@@ -259,7 +270,7 @@ async function getUserById(req, res, next) {
                Users.IsOnline as isOnline,
                Users.City as city,
                Users.Country as country,
-               Users.ZodiacSign as zodiacSign,
+               ${usersZodiacSelect}
                Users.IsEmailVerified as isEmailVerified,
                Users.CoupleType as coupleType,
                Users.PartnerEmail as partnerEmail,

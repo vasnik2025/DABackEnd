@@ -1,28 +1,35 @@
-﻿import { getPool, sql } from '../config/db';
+import type { ConnectionPool } from "mssql";
+import { getPool, sql } from "../config/db";
 
-export type DbUser = {
-  id: string;
-  email: string;
-  username?: string | null;
-  partnerEmail?: string | null;
-  partner1Nickname?: string | null;
-  partner2Nickname?: string | null;
-  coupleType?: string | null;
-  accountKind?: string | null;
-  zodiacSign?: string | null;
-  passwordHash?: string | null;
-  isEmailVerified?: boolean;
-  isPartnerEmailVerified?: boolean;
-  kind: 'couple' | 'single';
-};
+let cachedUsersTableSupportsZodiacSign: boolean | null = null;
 
-export async function findUserByEmail(email: string): Promise<DbUser | null> {
-  const pool = await getPool();
-  const normalized = email.toLowerCase();
-  const couple = await pool
-    .request()
-    .input('email', normalized)
-    .query(`
+export async function usersTableSupportsZodiacSign(pool?: ConnectionPool): Promise<boolean> {
+    if (cachedUsersTableSupportsZodiacSign !== null) {
+        return cachedUsersTableSupportsZodiacSign;
+    }
+    const activePool = pool ?? (await getPool());
+    const result = await activePool
+        .request()
+        .query(`
+      SELECT 1 AS HasColumn
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo'
+        AND TABLE_NAME = 'Users'
+        AND COLUMN_NAME = 'ZodiacSign'
+    `);
+    cachedUsersTableSupportsZodiacSign = Boolean(result.recordset?.length);
+    return cachedUsersTableSupportsZodiacSign;
+}
+const nullZodiacSelect = 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
+export async function findUserByEmail(email) {
+    const pool = await getPool();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const zodiacSelect = supportsZodiac ? 'ZodiacSign AS zodiacSign,' : nullZodiacSelect;
+    const normalized = email.toLowerCase();
+    const couple = await pool
+        .request()
+        .input('email', normalized)
+        .query(`
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
@@ -32,43 +39,40 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
         Partner2Nickname AS partner2Nickname,
         CoupleType AS coupleType,
         AccountKind AS accountKind,
-        ZodiacSign AS zodiacSign,
+        ${zodiacSelect}
         PasswordHash AS passwordHash,
         ISNULL(IsEmailVerified, 0) AS isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) AS isPartnerEmailVerified
       FROM Users
       WHERE LOWER(Email) = @email
     `);
-  if (couple.recordset?.length) {
-    const row = couple.recordset[0];
-    const accountKind = typeof row.accountKind === 'string' ? row.accountKind.trim().toLowerCase() : '';
-    const coupleTypeValue =
-      typeof row.coupleType === 'string' ? row.coupleType.trim().toLowerCase() : '';
-    const isSingleAccount =
-      accountKind === 'single' ||
-      coupleTypeValue === 'single' ||
-      (!row.partnerEmail && coupleTypeValue.length === 0);
-    return {
-      id: String(row.id),
-      email: String(row.email),
-      username: row.username ?? null,
-      partnerEmail: row.partnerEmail ?? null,
-      partner1Nickname: row.partner1Nickname ?? null,
-      partner2Nickname: row.partner2Nickname ?? null,
-      coupleType: row.coupleType ?? (isSingleAccount ? 'SINGLE' : null),
-      accountKind: isSingleAccount ? 'single' : (row.accountKind ?? 'couple'),
-      zodiacSign: row.zodiacSign ?? null,
-      passwordHash: row.passwordHash ?? null,
-      isEmailVerified: Boolean(row.isEmailVerified),
-      isPartnerEmailVerified: isSingleAccount ? true : Boolean(row.isPartnerEmailVerified),
-      kind: isSingleAccount ? 'single' : 'couple',
-    };
-  }
-
-  const single = await pool
-    .request()
-    .input('email', normalized)
-    .query(`
+    if (couple.recordset?.length) {
+        const row = couple.recordset[0];
+        const accountKind = typeof row.accountKind === 'string' ? row.accountKind.trim().toLowerCase() : '';
+        const coupleTypeValue = typeof row.coupleType === 'string' ? row.coupleType.trim().toLowerCase() : '';
+        const isSingleAccount = accountKind === 'single' ||
+            coupleTypeValue === 'single' ||
+            (!row.partnerEmail && coupleTypeValue.length === 0);
+        return {
+            id: String(row.id),
+            email: String(row.email),
+            username: row.username ?? null,
+            partnerEmail: row.partnerEmail ?? null,
+            partner1Nickname: row.partner1Nickname ?? null,
+            partner2Nickname: row.partner2Nickname ?? null,
+            coupleType: row.coupleType ?? (isSingleAccount ? 'SINGLE' : null),
+            accountKind: isSingleAccount ? 'single' : (row.accountKind ?? 'couple'),
+            zodiacSign: row.zodiacSign ?? null,
+            passwordHash: row.passwordHash ?? null,
+            isEmailVerified: Boolean(row.isEmailVerified),
+            isPartnerEmailVerified: isSingleAccount ? true : Boolean(row.isPartnerEmailVerified),
+            kind: isSingleAccount ? 'single' : 'couple',
+        };
+    }
+    const single = await pool
+        .request()
+        .input('email', normalized)
+        .query(`
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
@@ -78,42 +82,34 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
       FROM SingleUsers
       WHERE LOWER(Email) = @email
     `);
-  if (single.recordset?.length) {
-    const row = single.recordset[0];
-    return {
-      id: String(row.id),
-      email: String(row.email ?? ''),
-      username: row.username ?? null,
-      partnerEmail: null,
-      partner1Nickname: null,
-      partner2Nickname: null,
-      coupleType: 'SINGLE',
-      zodiacSign: null,
-      passwordHash: row.passwordHash ?? null,
-      isEmailVerified: Boolean(row.isEmailVerified),
-      isPartnerEmailVerified: true,
-      kind: 'single',
-    };
-  }
-
-  return null;
+    if (single.recordset?.length) {
+        const row = single.recordset[0];
+        return {
+            id: String(row.id),
+            email: String(row.email ?? ''),
+            username: row.username ?? null,
+            partnerEmail: null,
+            partner1Nickname: null,
+            partner2Nickname: null,
+            coupleType: 'SINGLE',
+            zodiacSign: null,
+            passwordHash: row.passwordHash ?? null,
+            isEmailVerified: Boolean(row.isEmailVerified),
+            isPartnerEmailVerified: true,
+            kind: 'single',
+        };
+    }
+    return null;
 }
-
-export async function findUserByUsernameOrEmail(
-  usernameOrEmail: string,
-): Promise<
-  DbUser & {
-    isEmailVerified: boolean;
-    isPartnerEmailVerified: boolean;
-    activeLoginEmail?: string;
-  } | null
-> {
-  const pool = await getPool();
-  const normalized = usernameOrEmail.toLowerCase();
-  const res = await pool
-    .request()
-    .input('usernameOrEmail', normalized)
-    .query(`
+export async function findUserByUsernameOrEmail(usernameOrEmail) {
+    const pool = await getPool();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const zodiacSelect = supportsZodiac ? 'ZodiacSign AS zodiacSign,' : nullZodiacSelect;
+    const normalized = usernameOrEmail.toLowerCase();
+    const res = await pool
+        .request()
+        .input('usernameOrEmail', normalized)
+        .query(`
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
@@ -123,7 +119,7 @@ export async function findUserByUsernameOrEmail(
         Partner2Nickname AS partner2Nickname,
         CoupleType AS coupleType,
         AccountKind AS accountKind,
-        ZodiacSign AS zodiacSign,
+        ${zodiacSelect}
         PasswordHash AS passwordHash,
         ISNULL(IsEmailVerified, 0) as isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) as isPartnerEmailVerified
@@ -132,46 +128,41 @@ export async function findUserByUsernameOrEmail(
          OR (PartnerEmail IS NOT NULL AND LOWER(PartnerEmail) = @usernameOrEmail)
          OR LOWER(Username) = @usernameOrEmail
     `);
-  const record = res.recordset[0] ?? null;
-  if (record) {
-    const emailLower = String(record.email ?? '').toLowerCase();
-    const partnerLower = String(record.partnerEmail ?? '').toLowerCase();
-    const activeLoginEmail =
-      normalized === partnerLower && partnerLower
-           ? partnerLower
-           : normalized === emailLower
-             ? emailLower
-             : normalized;
-    const accountKind = typeof record.accountKind === 'string' ? record.accountKind.trim().toLowerCase() : '';
-    const coupleTypeValue =
-      typeof record.coupleType === 'string' ? record.coupleType.trim().toLowerCase() : '';
-    const isSingleAccount =
-      accountKind === 'single' ||
-      coupleTypeValue === 'single' ||
-      (!record.partnerEmail && coupleTypeValue.length === 0);
-
-    return {
-      id: String(record.id),
-      email: String(record.email ?? ''),
-      username: record.username ?? null,
-      partnerEmail: record.partnerEmail ?? null,
-      partner1Nickname: record.partner1Nickname ?? null,
-      partner2Nickname: record.partner2Nickname ?? null,
-      coupleType: record.coupleType ?? (isSingleAccount ? 'SINGLE' : null),
-      accountKind: isSingleAccount ? 'single' : (record.accountKind ?? 'couple'),
-      zodiacSign: record.zodiacSign ?? null,
-      passwordHash: record.passwordHash ?? null,
-      isEmailVerified: Boolean(record.isEmailVerified),
-      isPartnerEmailVerified: isSingleAccount ? true : Boolean(record.isPartnerEmailVerified),
-      activeLoginEmail,
-      kind: isSingleAccount ? 'single' : 'couple',
-    };
-  }
-
-  const singleResult = await pool
-    .request()
-    .input('usernameOrEmail', normalized)
-    .query(`
+    const record = res.recordset[0] ?? null;
+    if (record) {
+        const emailLower = String(record.email ?? '').toLowerCase();
+        const partnerLower = String(record.partnerEmail ?? '').toLowerCase();
+        const activeLoginEmail = normalized === partnerLower && partnerLower
+            ? partnerLower
+            : normalized === emailLower
+                ? emailLower
+                : normalized;
+        const accountKind = typeof record.accountKind === 'string' ? record.accountKind.trim().toLowerCase() : '';
+        const coupleTypeValue = typeof record.coupleType === 'string' ? record.coupleType.trim().toLowerCase() : '';
+        const isSingleAccount = accountKind === 'single' ||
+            coupleTypeValue === 'single' ||
+            (!record.partnerEmail && coupleTypeValue.length === 0);
+        return {
+            id: String(record.id),
+            email: String(record.email ?? ''),
+            username: record.username ?? null,
+            partnerEmail: record.partnerEmail ?? null,
+            partner1Nickname: record.partner1Nickname ?? null,
+            partner2Nickname: record.partner2Nickname ?? null,
+            coupleType: record.coupleType ?? (isSingleAccount ? 'SINGLE' : null),
+            accountKind: isSingleAccount ? 'single' : (record.accountKind ?? 'couple'),
+            zodiacSign: record.zodiacSign ?? null,
+            passwordHash: record.passwordHash ?? null,
+            isEmailVerified: Boolean(record.isEmailVerified),
+            isPartnerEmailVerified: isSingleAccount ? true : Boolean(record.isPartnerEmailVerified),
+            activeLoginEmail,
+            kind: isSingleAccount ? 'single' : 'couple',
+        };
+    }
+    const singleResult = await pool
+        .request()
+        .input('usernameOrEmail', normalized)
+        .query(`
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
@@ -182,54 +173,38 @@ export async function findUserByUsernameOrEmail(
       WHERE LOWER(Email) = @usernameOrEmail
          OR LOWER(Username) = @usernameOrEmail
     `);
-
-  const single = singleResult.recordset[0] ?? null;
-  if (!single) return null;
-
-  return {
-    id: String(single.id),
-    email: String(single.email ?? ''),
-    username: single.username ?? null,
-    partnerEmail: null,
-    partner1Nickname: null,
-    partner2Nickname: null,
-    coupleType: 'SINGLE',
-    accountKind: 'single',
-    zodiacSign: null,
-    passwordHash: single.passwordHash ?? null,
-    isEmailVerified: Boolean(single.isEmailVerified),
-    isPartnerEmailVerified: true,
-    activeLoginEmail: single.email ?? undefined,
-    kind: 'single',
-  };
+    const single = singleResult.recordset[0] ?? null;
+    if (!single)
+        return null;
+    return {
+        id: String(single.id),
+        email: String(single.email ?? ''),
+        username: single.username ?? null,
+        partnerEmail: null,
+        partner1Nickname: null,
+        partner2Nickname: null,
+        coupleType: 'SINGLE',
+        accountKind: 'single',
+        zodiacSign: null,
+        passwordHash: single.passwordHash ?? null,
+        isEmailVerified: Boolean(single.isEmailVerified),
+        isPartnerEmailVerified: true,
+        activeLoginEmail: single.email ?? undefined,
+        kind: 'single',
+    };
 }
-
-export async function findCoupleByEmails(
-  primaryEmail: string,
-  partnerEmail: string,
-): Promise<{
-  id: string;
-  primaryEmail: string;
-  partnerEmail: string | null;
-  username: string | null;
-  partner1Nickname: string | null;
-  partner2Nickname: string | null;
-  isEmailVerified: boolean;
-  isPartnerEmailVerified: boolean;
-} | null> {
-  const normalizedPrimary = primaryEmail.trim().toLowerCase();
-  const normalizedPartner = partnerEmail.trim().toLowerCase();
-
-  if (!normalizedPrimary.length || !normalizedPartner.length) {
-    return null;
-  }
-
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('primaryEmail', normalizedPrimary)
-    .input('partnerEmail', normalizedPartner)
-    .query(`
+export async function findCoupleByEmails(primaryEmail, partnerEmail) {
+    const normalizedPrimary = primaryEmail.trim().toLowerCase();
+    const normalizedPartner = partnerEmail.trim().toLowerCase();
+    if (!normalizedPrimary.length || !normalizedPartner.length) {
+        return null;
+    }
+    const pool = await getPool();
+    const result = await pool
+        .request()
+        .input('primaryEmail', normalizedPrimary)
+        .input('partnerEmail', normalizedPartner)
+        .query(`
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS primaryEmail,
@@ -246,104 +221,79 @@ export async function findCoupleByEmails(
         LOWER(Email) = @partnerEmail AND LOWER(PartnerEmail) = @primaryEmail
       )
     `);
-
-  const record = result.recordset?.[0];
-  if (!record) {
-    return null;
-  }
-
-  return {
-    id: String(record.id),
-    primaryEmail: record.primaryEmail ? String(record.primaryEmail).toLowerCase() : '',
-    partnerEmail: record.partnerEmail ? String(record.partnerEmail).toLowerCase() : null,
-    username: record.username ?? null,
-    partner1Nickname: record.partner1Nickname ?? null,
-    partner2Nickname: record.partner2Nickname ?? null,
-    isEmailVerified: Boolean(record.isEmailVerified),
-    isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
-  };
+    const record = result.recordset?.[0];
+    if (!record) {
+        return null;
+    }
+    return {
+        id: String(record.id),
+        primaryEmail: record.primaryEmail ? String(record.primaryEmail).toLowerCase() : '',
+        partnerEmail: record.partnerEmail ? String(record.partnerEmail).toLowerCase() : null,
+        username: record.username ?? null,
+        partner1Nickname: record.partner1Nickname ?? null,
+        partner2Nickname: record.partner2Nickname ?? null,
+        isEmailVerified: Boolean(record.isEmailVerified),
+        isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+    };
 }
-
-export async function refreshCoupleMembershipStatus(
-  userId: string,
-): Promise<{ membershipType: string | null; membershipExpiryDate: Date | null; downgraded: boolean }> {
-  const pool = await getPool();
-
-  const current = await pool
-    .request()
-    .input('userId', sql.VarChar(255), userId)
-    .query(`
+export async function refreshCoupleMembershipStatus(userId) {
+    const pool = await getPool();
+    const current = await pool
+        .request()
+        .input('userId', sql.VarChar(255), userId)
+        .query(`
       SELECT
         MembershipType,
         MembershipExpiryDate
       FROM Users
       WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @userId)
     `);
-
-  const row = current.recordset?.[0];
-  if (!row) {
-    return { membershipType: null, membershipExpiryDate: null, downgraded: false };
-  }
-
-  const rawType =
-    typeof row.MembershipType === 'string' ? row.MembershipType.trim() : null;
-  const normalizedType = rawType?.toLowerCase() ?? '';
-  const expiryValue = row.MembershipExpiryDate ?? null;
-  const expiryDate =
-    expiryValue instanceof Date
-      ? expiryValue
-      : expiryValue
-      ? new Date(expiryValue)
-      : null;
-  const expired = expiryDate ? expiryDate.getTime() <= Date.now() : false;
-
-  if (normalizedType && normalizedType !== 'free' && expired) {
-    await pool
-      .request()
-      .input('userId', sql.VarChar(255), userId)
-      .query(`
+    const row = current.recordset?.[0];
+    if (!row) {
+        return { membershipType: null, membershipExpiryDate: null, downgraded: false };
+    }
+    const rawType = typeof row.MembershipType === 'string' ? row.MembershipType.trim() : null;
+    const normalizedType = rawType?.toLowerCase() ?? '';
+    const expiryValue = row.MembershipExpiryDate ?? null;
+    const expiryDate = expiryValue instanceof Date
+        ? expiryValue
+        : expiryValue
+            ? new Date(expiryValue)
+            : null;
+    const expired = expiryDate ? expiryDate.getTime() <= Date.now() : false;
+    if (normalizedType && normalizedType !== 'free' && expired) {
+        await pool
+            .request()
+            .input('userId', sql.VarChar(255), userId)
+            .query(`
         UPDATE Users
         SET MembershipType = 'free',
             MembershipExpiryDate = NULL,
             SubscribedAt = NULL
         WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @userId)
       `);
-
-    return { membershipType: 'free', membershipExpiryDate: null, downgraded: true };
-  }
-
-  return {
-    membershipType: rawType ?? null,
-    membershipExpiryDate: expiryDate ?? null,
-    downgraded: false,
-  };
+        return { membershipType: 'free', membershipExpiryDate: null, downgraded: true };
+    }
+    return {
+        membershipType: rawType ?? null,
+        membershipExpiryDate: expiryDate ?? null,
+        downgraded: false,
+    };
 }
-
-export async function createUser(data: {
-  email: string;
-  passwordHash: string;
-  username: string;
-  partnerEmail: string | null;
-  coupleType: string | null;
-  country: string;
-  city: string;
-  partner1Nickname: string;
-  partner2Nickname: string;
-  zodiacSign: string;
-}) {
-  const pool = await getPool();
-  const res = await pool.request()
-    .input('email', data.email.toLowerCase())
-    .input('passwordHash', data.passwordHash)
-    .input('username', data.username)
-    .input('partnerEmail', data.partnerEmail ? data.partnerEmail.toLowerCase() : null)
-    .input('coupleType', typeof data.coupleType === 'string' ? data.coupleType.toUpperCase() : null)
-    .input('country', data.country)
-    .input('city', data.city)
-    .input('partner1Nickname', data.partner1Nickname)
-    .input('partner2Nickname', data.partner2Nickname)
-    .input('zodiacSign', sql.NVarChar(64), data.zodiacSign)
-    .query(`
+export async function createUser(data) {
+    const pool = await getPool();
+    const res = await pool.request()
+        .input('email', data.email.toLowerCase())
+        .input('passwordHash', data.passwordHash)
+        .input('username', data.username)
+        .input('partnerEmail', data.partnerEmail ? data.partnerEmail.toLowerCase() : null)
+        .input('coupleType', typeof data.coupleType === 'string' ? data.coupleType.toUpperCase() : null)
+        .input('country', data.country)
+        .input('city', data.city)
+        .input('partner1Nickname', data.partner1Nickname)
+        .input('partner2Nickname', data.partner2Nickname)
+        .input('zodiacSign', sql.NVarChar(64), data.zodiacSign)
+        .query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
         UserID, Email, PasswordHash, Username, CreatedAt,
@@ -357,43 +307,30 @@ export async function createUser(data: {
       );
       SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email, @zodiacSign AS zodiacSign;
   `);
-  return res.recordset[0];
+    return res.recordset[0];
 }
-
-export async function createSingleUser(data: {
-  email: string;
-  passwordHash: string;
-  username: string;
-  partner1Nickname: string;
-  partner2Nickname?: string | null;
-  country?: string | null;
-  city?: string | null;
-  zodiacSign: string;
-}) {
-  const pool = await getPool();
-  const normalizedEmail = data.email.toLowerCase();
-  const zodiac = data.zodiacSign?.trim?.() ?? 'SINGLE';
-  const partner1Nickname =
-    typeof data.partner1Nickname === 'string' && data.partner1Nickname.trim().length
-      ? data.partner1Nickname.trim()
-      : data.username;
-  const partner2Nickname =
-    typeof data.partner2Nickname === 'string' && data.partner2Nickname.trim().length
-      ? data.partner2Nickname.trim()
-      : partner1Nickname;
-
-  const res = await pool
-    .request()
-    .input('email', sql.NVarChar(320), normalizedEmail)
-    .input('passwordHash', sql.NVarChar(255), data.passwordHash)
-    .input('username', sql.NVarChar(255), data.username)
-    .input('partner1Nickname', sql.NVarChar(255), partner1Nickname)
-    .input('partner2Nickname', sql.NVarChar(255), partner2Nickname)
-    .input('country', sql.NVarChar(255), data.country ?? null)
-    .input('city', sql.NVarChar(255), data.city ?? null)
-    .input('coupleType', sql.NVarChar(50), null)
-    .input('zodiacSign', sql.NVarChar(64), zodiac)
-    .query(`
+export async function createSingleUser(data) {
+    const pool = await getPool();
+    const normalizedEmail = data.email.toLowerCase();
+    const zodiac = data.zodiacSign?.trim?.() ?? 'SINGLE';
+    const partner1Nickname = typeof data.partner1Nickname === 'string' && data.partner1Nickname.trim().length
+        ? data.partner1Nickname.trim()
+        : data.username;
+    const partner2Nickname = typeof data.partner2Nickname === 'string' && data.partner2Nickname.trim().length
+        ? data.partner2Nickname.trim()
+        : partner1Nickname;
+    const res = await pool
+        .request()
+        .input('email', sql.NVarChar(320), normalizedEmail)
+        .input('passwordHash', sql.NVarChar(255), data.passwordHash)
+        .input('username', sql.NVarChar(255), data.username)
+        .input('partner1Nickname', sql.NVarChar(255), partner1Nickname)
+        .input('partner2Nickname', sql.NVarChar(255), partner2Nickname)
+        .input('country', sql.NVarChar(255), data.country ?? null)
+        .input('city', sql.NVarChar(255), data.city ?? null)
+        .input('coupleType', sql.NVarChar(50), null)
+        .input('zodiacSign', sql.NVarChar(64), zodiac)
+        .query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
         UserID,
@@ -431,36 +368,21 @@ export async function createSingleUser(data: {
       );
       SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email, @zodiacSign AS zodiacSign;
     `);
-  return res.recordset[0];
+    return res.recordset[0];
 }
-
-export async function listCoupleEmailsByCountry(
-  country: string | null | undefined,
-  options?: { excludeUserId?: string | null },
-): Promise<
-  Array<{
-    userId: string;
-    primaryEmail: string;
-    partnerEmail: string | null;
-    isPartnerEmailVerified: boolean;
-  }>
-> {
-  const normalizedCountry =
-    typeof country === 'string' ? country.trim().toLowerCase() : '';
-  if (!normalizedCountry.length) {
-    return [];
-  }
-
-  const pool = await getPool();
-  const request = pool
-    .request()
-    .input('country', normalizedCountry);
-
-  if (options?.excludeUserId) {
-    request.input('excludeUserId', sql.VarChar(255), options.excludeUserId);
-  }
-
-  const result = await request.query(`
+export async function listCoupleEmailsByCountry(country, options) {
+    const normalizedCountry = typeof country === 'string' ? country.trim().toLowerCase() : '';
+    if (!normalizedCountry.length) {
+        return [];
+    }
+    const pool = await getPool();
+    const request = pool
+        .request()
+        .input('country', normalizedCountry);
+    if (options?.excludeUserId) {
+        request.input('excludeUserId', sql.VarChar(255), options.excludeUserId);
+    }
+    const result = await request.query(`
     SELECT
       CAST(UserID AS NVARCHAR(100)) AS userId,
       LOWER(Email) AS primaryEmail,
@@ -472,77 +394,70 @@ export async function listCoupleEmailsByCountry(
       AND LOWER(Country) = @country
       ${options?.excludeUserId ? 'AND UserID <> TRY_CONVERT(UNIQUEIDENTIFIER, @excludeUserId)' : ''}
   `);
-
-  return (result.recordset ?? [])
-    .filter((row) => Boolean(row.primaryEmail) && Boolean(row.isEmailVerified))
-    .map((row) => ({
-      userId: String(row.userId),
-      primaryEmail: String(row.primaryEmail),
-      partnerEmail: row.partnerEmail ? String(row.partnerEmail) : null,
-      isPartnerEmailVerified: Boolean(row.isPartnerEmailVerified),
+    return (result.recordset ?? [])
+        .filter((row) => Boolean(row.primaryEmail) && Boolean(row.isEmailVerified))
+        .map((row) => ({
+        userId: String(row.userId),
+        primaryEmail: String(row.primaryEmail),
+        partnerEmail: row.partnerEmail ? String(row.partnerEmail) : null,
+        isPartnerEmailVerified: Boolean(row.isPartnerEmailVerified),
     }));
 }
-
-export async function setUserEmailVerified(userId: string): Promise<void> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('UserID', sql.VarChar(255), userId)
-    .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
-
-  const updated = result.rowsAffected?.[0] ?? 0;
-  if (!updated) {
-    await pool
-      .request()
-      .input('UserID', sql.VarChar(255), userId)
-      .query('UPDATE SingleUsers SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
-  }
+export async function setUserEmailVerified(userId) {
+    const pool = await getPool();
+    const result = await pool
+        .request()
+        .input('UserID', sql.VarChar(255), userId)
+        .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
+    const updated = result.rowsAffected?.[0] ?? 0;
+    if (!updated) {
+        await pool
+            .request()
+            .input('UserID', sql.VarChar(255), userId)
+            .query('UPDATE SingleUsers SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
+    }
 }
-
-export async function setPartnerEmailVerified(userId: string): Promise<void> {
-  const pool = await getPool();
-  await pool.request()
-    .input('UserID', sql.VarChar(255), userId)
-    .query('UPDATE Users SET IsPartnerEmailVerified = 1 WHERE UserID = @UserID');
+export async function setPartnerEmailVerified(userId) {
+    const pool = await getPool();
+    await pool.request()
+        .input('UserID', sql.VarChar(255), userId)
+        .query('UPDATE Users SET IsPartnerEmailVerified = 1 WHERE UserID = @UserID');
 }
-
-export async function getUserVerificationStatus(
-  userId: string,
-): Promise<{ isEmailVerified: boolean; isPartnerEmailVerified: boolean }> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('UserID', sql.VarChar(255), userId)
-    .query(`
+export async function getUserVerificationStatus(userId) {
+    const pool = await getPool();
+    const result = await pool
+        .request()
+        .input('UserID', sql.VarChar(255), userId)
+        .query(`
       SELECT
         ISNULL(IsEmailVerified, 0) AS isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) AS isPartnerEmailVerified
       FROM Users
       WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)
     `);
-
-  const record = result.recordset?.[0];
-  if (record) {
-    return {
-      isEmailVerified: Boolean(record.isEmailVerified),
-      isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
-    };
-  }
-
-  const singleResult = await pool
-    .request()
-    .input('UserID', sql.VarChar(255), userId)
-    .query(`
+    const record = result.recordset?.[0];
+    if (record) {
+        return {
+            isEmailVerified: Boolean(record.isEmailVerified),
+            isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+        };
+    }
+    const singleResult = await pool
+        .request()
+        .input('UserID', sql.VarChar(255), userId)
+        .query(`
       SELECT ISNULL(IsEmailVerified, 0) AS isEmailVerified
       FROM SingleUsers
       WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)
     `);
-
-  const singleRecord = singleResult.recordset?.[0] ?? {};
-  return {
-    isEmailVerified: Boolean(singleRecord.isEmailVerified),
-    isPartnerEmailVerified: true,
-  };
+    const singleRecord = singleResult.recordset?.[0] ?? {};
+    return {
+        isEmailVerified: Boolean(singleRecord.isEmailVerified),
+        isPartnerEmailVerified: true,
+    };
 }
+
+
+
 
 

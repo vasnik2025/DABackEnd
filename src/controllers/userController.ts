@@ -13,6 +13,7 @@ import { insertPasswordShareRecord } from '../utils/passwordShare';
 import { PASSWORD_REQUIREMENTS_MESSAGE, isPasswordStrong } from '../utils/passwordPolicy';
 import { fetchAdmirersForUser, fetchFavoritesOfUser } from '../services/admirerService';
 import { deleteUserAndAssociations } from '../services/accountDeletionService';
+import { usersTableSupportsZodiacSign } from '../services/userService';
 
 const ALLOWED_FAVORITE_COLUMNS = ['FavoriteUserID', 'FavoriteID'] as const;
 type FavoriteColumn = typeof ALLOWED_FAVORITE_COLUMNS[number];
@@ -109,6 +110,9 @@ type BasicUserInfo = {
 };
 
 const loadBasicUserInfo = async (userId: string): Promise<BasicUserInfo | null> => {
+  const supportsZodiac = await usersTableSupportsZodiacSign();
+  const zodiacSelect = supportsZodiac ? 'ZodiacSign' : 'CAST(NULL AS NVARCHAR(64)) AS ZodiacSign';
+
   const coupleResult = await withSqlRetry((pool) =>
     pool
       .request()
@@ -121,7 +125,7 @@ const loadBasicUserInfo = async (userId: string): Promise<BasicUserInfo | null> 
           PartnerEmail,
           Partner1Nickname,
           Partner2Nickname,
-          ZodiacSign
+          ${zodiacSelect}
         FROM dbo.Users
         WHERE UserID = @UserID;
       `),
@@ -195,6 +199,10 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
   const { currentUserId } = req.query;
   try {
     const pool = await getPool();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const usersZodiacSelect = supportsZodiac
+      ? 'Users.ZodiacSign as zodiacSign,'
+      : 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
     const request = pool.request();
 
     const conditions: string[] = [
@@ -243,7 +251,7 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
              Users.IsOnline as isOnline,
              Users.City as city,
              Users.Country as country,
-             Users.ZodiacSign as zodiacSign,
+             ${usersZodiacSelect}
              Users.IsEmailVerified as isEmailVerified,
              Users.CoupleType as coupleType,
              Users.PartnerEmail as partnerEmail,
@@ -277,6 +285,10 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
   const { userId } = req.params;
   try {
     const pool = await getPool();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const usersZodiacSelect = supportsZodiac
+      ? 'Users.ZodiacSign as zodiacSign,'
+      : 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
     const result = await pool.request()
       .input('UserID', sql.VarChar(255), userId)
       .query(`
@@ -315,7 +327,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
                Users.IsOnline as isOnline,
                Users.City as city,
                Users.Country as country,
-               Users.ZodiacSign as zodiacSign,
+               ${usersZodiacSelect}
                Users.IsEmailVerified as isEmailVerified,
                Users.CoupleType as coupleType,
                Users.PartnerEmail as partnerEmail,
