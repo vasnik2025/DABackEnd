@@ -292,7 +292,8 @@ async function refreshCoupleMembershipStatus(userId) {
 }
 async function createUser(data) {
     const pool = await (0, db_1.getPool)();
-    const res = await pool.request()
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const request = pool.request()
         .input('email', data.email.toLowerCase())
         .input('passwordHash', data.passwordHash)
         .input('username', data.username)
@@ -301,26 +302,33 @@ async function createUser(data) {
         .input('country', data.country)
         .input('city', data.city)
         .input('partner1Nickname', data.partner1Nickname)
-        .input('partner2Nickname', data.partner2Nickname)
-        .input('zodiacSign', db_1.sql.NVarChar(64), data.zodiacSign)
+        .input('partner2Nickname', data.partner2Nickname);
+    if (supportsZodiac) {
+        request.input('zodiacSign', db_1.sql.NVarChar(64), data.zodiacSign);
+    }
+    const zodiacInsertColumn = supportsZodiac ? ', ZodiacSign' : '';
+    const zodiacInsertValue = supportsZodiac ? ', @zodiacSign' : '';
+    const zodiacSelect = supportsZodiac ? ', @zodiacSign AS zodiacSign' : ', CAST(NULL AS NVARCHAR(64)) AS zodiacSign';
+    const res = await request
         .query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
         UserID, Email, PasswordHash, Username, CreatedAt,
-        PartnerEmail, CoupleType, Country, City, Partner1Nickname, Partner2Nickname, ZodiacSign,
+        PartnerEmail, CoupleType, Country, City, Partner1Nickname, Partner2Nickname${zodiacInsertColumn},
         IsEmailVerified, IsPartnerEmailVerified
       )
       VALUES (
         @id, @email, @passwordHash, @username, SYSUTCDATETIME(),
-        @partnerEmail, @coupleType, @country, @city, @partner1Nickname, @partner2Nickname, @zodiacSign,
+        @partnerEmail, @coupleType, @country, @city, @partner1Nickname, @partner2Nickname${zodiacInsertValue},
         0, 0
       );
-      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email, @zodiacSign AS zodiacSign;
+      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email${zodiacSelect};
   `);
     return res.recordset[0];
 }
 async function createSingleUser(data) {
     const pool = await (0, db_1.getPool)();
+    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
     const normalizedEmail = data.email.toLowerCase();
     const zodiac = data.zodiacSign?.trim?.() ?? 'SINGLE';
     const partner1Nickname = typeof data.partner1Nickname === 'string' && data.partner1Nickname.trim().length
@@ -329,7 +337,7 @@ async function createSingleUser(data) {
     const partner2Nickname = typeof data.partner2Nickname === 'string' && data.partner2Nickname.trim().length
         ? data.partner2Nickname.trim()
         : partner1Nickname;
-    const res = await pool
+    const request = pool
         .request()
         .input('email', db_1.sql.NVarChar(320), normalizedEmail)
         .input('passwordHash', db_1.sql.NVarChar(255), data.passwordHash)
@@ -338,9 +346,14 @@ async function createSingleUser(data) {
         .input('partner2Nickname', db_1.sql.NVarChar(255), partner2Nickname)
         .input('country', db_1.sql.NVarChar(255), data.country ?? null)
         .input('city', db_1.sql.NVarChar(255), data.city ?? null)
-        .input('coupleType', db_1.sql.NVarChar(50), null)
-        .input('zodiacSign', db_1.sql.NVarChar(64), zodiac)
-        .query(`
+        .input('coupleType', db_1.sql.NVarChar(50), null);
+    if (supportsZodiac) {
+        request.input('zodiacSign', db_1.sql.NVarChar(64), zodiac);
+    }
+    const zodiacInsertColumn = supportsZodiac ? ', ZodiacSign' : '';
+    const zodiacInsertValue = supportsZodiac ? ', @zodiacSign' : '';
+    const zodiacSelect = supportsZodiac ? ', @zodiacSign AS zodiacSign' : ', CAST(NULL AS NVARCHAR(64)) AS zodiacSign';
+    const res = await request.query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
         UserID,
@@ -355,7 +368,7 @@ async function createSingleUser(data) {
         City,
         Partner1Nickname,
         Partner2Nickname,
-        ZodiacSign,
+        ${supportsZodiac ? 'ZodiacSign,' : ''}
         IsEmailVerified,
         IsPartnerEmailVerified
       )
@@ -371,13 +384,12 @@ async function createSingleUser(data) {
         @country,
         @city,
         @partner1Nickname,
-        @partner2Nickname,
-        @zodiacSign,
+        @partner2Nickname${zodiacInsertValue},
         0,
         1
       );
-      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email, @zodiacSign AS zodiacSign;
-    `);
+      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email${zodiacSelect};
+  `);
     return res.recordset[0];
 }
 async function listCoupleEmailsByCountry(country, options) {
