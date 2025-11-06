@@ -82,7 +82,8 @@ const loadBasicUserInfo = async (userId) => {
           Username,
           PartnerEmail,
           Partner1Nickname,
-          Partner2Nickname
+          Partner2Nickname,
+          ZodiacSign
         FROM dbo.Users
         WHERE UserID = @UserID;
       `));
@@ -95,6 +96,7 @@ const loadBasicUserInfo = async (userId) => {
             partnerEmail: coupleRow.PartnerEmail ?? null,
             partner1Nickname: coupleRow.Partner1Nickname ?? null,
             partner2Nickname: coupleRow.Partner2Nickname ?? null,
+            zodiacSign: coupleRow.ZodiacSign ?? null,
         };
     }
     if (!isValidGuid(userId)) {
@@ -134,6 +136,7 @@ const loadBasicUserInfo = async (userId) => {
             ? singleRow.PreferredNickname.trim()
             : null,
         partner2Nickname: null,
+        zodiacSign: null,
     };
 };
 async function getAllUsers(req, res, next) {
@@ -185,6 +188,7 @@ async function getAllUsers(req, res, next) {
              Users.IsOnline as isOnline,
              Users.City as city,
              Users.Country as country,
+             Users.ZodiacSign as zodiacSign,
              Users.IsEmailVerified as isEmailVerified,
              Users.CoupleType as coupleType,
              Users.PartnerEmail as partnerEmail,
@@ -255,6 +259,7 @@ async function getUserById(req, res, next) {
                Users.IsOnline as isOnline,
                Users.City as city,
                Users.Country as country,
+               Users.ZodiacSign as zodiacSign,
                Users.IsEmailVerified as isEmailVerified,
                Users.CoupleType as coupleType,
                Users.PartnerEmail as partnerEmail,

@@ -5,6 +5,21 @@ import {
   isPasswordStrong,
 } from '../utils/passwordPolicy';
 
+const ZODIAC_SIGNS = [
+  'Aries',
+  'Taurus',
+  'Gemini',
+  'Cancer',
+  'Leo',
+  'Virgo',
+  'Libra',
+  'Scorpio',
+  'Sagittarius',
+  'Capricorn',
+  'Aquarius',
+  'Pisces',
+] as const;
+
 // We validate *after* normalizing aliases to {email,password}
 export const loginSchema = z.object({
   body: z.object({
@@ -18,6 +33,7 @@ export const registerSchema = z.object({
     accountType: z.enum(['single', 'couple']).default('single'),
     username: z.string().min(1, 'Username is required.'),
     email: z.string().email('Invalid email'),
+    zodiacSign: z.enum(ZODIAC_SIGNS, { errorMap: () => ({ message: 'Please choose your zodiac sign.' }) }),
     password: z
       .string()
       .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`)

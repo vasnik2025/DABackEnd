@@ -162,6 +162,7 @@ export async function register(req: Request, res: Response) {
       city,
       partner1Nickname,
       partner2Nickname,
+      zodiacSign,
     } = parsed.data.body;
 
     const normalizedAccountType = accountType === 'single' ? 'single' : 'couple';
@@ -177,6 +178,11 @@ export async function register(req: Request, res: Response) {
     const trimmedPartner2Nickname = partner2Nickname?.trim() ?? '';
     const trimmedCountry = country.trim();
     const trimmedCity = city.trim();
+    const normalizedZodiacSign = zodiacSign.trim();
+
+    if (!normalizedZodiacSign.length) {
+      return res.status(400).json({ message: 'Please select your zodiac sign.' });
+    }
 
     const existingByEmail = await findUserByEmail(normalizedEmail);
     if (existingByEmail) return res.status(409).json({ message: 'Email already in use' });
@@ -201,6 +207,7 @@ export async function register(req: Request, res: Response) {
         partner2Nickname: resolvedPartner2Nickname,
         country: trimmedCountry || null,
         city: trimmedCity || null,
+        zodiacSign: normalizedZodiacSign,
       });
 
       const manualVerificationHints: ManualVerificationHint[] = [];
@@ -277,6 +284,7 @@ export async function register(req: Request, res: Response) {
         city: trimmedCity,
         partner1Nickname: trimmedPartner1Nickname,
         partner2Nickname: trimmedPartner2Nickname,
+        zodiacSign: normalizedZodiacSign,
     };
     
     const user = await createUser(userPayload);
@@ -576,6 +584,7 @@ export async function login(req: Request, res: Response) {
         ? membershipStatus.membershipExpiryDate.toISOString()
         : null,
       membershipDowngraded: membershipStatus.downgraded,
+      zodiacSign: user.zodiacSign ?? null,
     });
   }
 
@@ -621,6 +630,7 @@ export async function login(req: Request, res: Response) {
       ? membershipStatus.membershipExpiryDate.toISOString()
       : null,
     membershipDowngraded: membershipStatus.downgraded,
+    zodiacSign: user.zodiacSign ?? null,
   });
 }
 

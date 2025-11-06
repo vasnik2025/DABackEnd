@@ -51,7 +51,7 @@ const SUPPORT_EMAIL = 'info@dateastrum.com';
 // FIX: Changed sender to a valid 'MailFrom' address based on server logs.
 const SENDER_NOTIFICATIONS = 'DoNotReply@dateastrum.com';
 const SENDER_SUPPORT = SENDER_NOTIFICATIONS;
-const SENDER_VERIFICATION = 'MailVerification@dateastrum.com';
+const SENDER_VERIFICATION = 'DoNotReply@dateastrum.com';
 const ACS_CONNECTION_STRING = (process.env.COMMUNICATION_SERVICES_CONNECTION_STRING || '').trim();
 const ACS_ENDPOINT = (() => {
     const endpointPart = ACS_CONNECTION_STRING.split(';').find((part) => part.toLowerCase().startsWith('endpoint='));

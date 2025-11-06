@@ -22,7 +22,6 @@ const authSchemas_1 = require("../validators/authSchemas");
 const db_1 = require("../config/db");
 const userService_1 = require("../services/userService");
 const passwordResetService_1 = require("../services/passwordResetService");
-const singleMemberService_1 = require("../services/singleMemberService");
 const emailService_1 = require("../utils/emailService");
 const passwordShare_1 = require("../utils/passwordShare");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
@@ -91,7 +90,7 @@ async function register(req, res) {
         if (!parsed.success) {
             return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
         }
-        const { accountType, email, password, partnerEmail, username, coupleType, country, city, partner1Nickname, partner2Nickname, } = parsed.data.body;
+        const { accountType, email, password, partnerEmail, username, coupleType, country, city, partner1Nickname, partner2Nickname, zodiacSign, } = parsed.data.body;
         const normalizedAccountType = accountType === 'single' ? 'single' : 'couple';
         if (!(0, passwordPolicy_1.isPasswordStrong)(password)) {
             return res.status(400).json({ message: passwordPolicy_1.PASSWORD_REQUIREMENTS_MESSAGE });
@@ -103,6 +102,10 @@ async function register(req, res) {
         const trimmedPartner2Nickname = partner2Nickname?.trim() ?? '';
         const trimmedCountry = country.trim();
         const trimmedCity = city.trim();
+        const normalizedZodiacSign = zodiacSign.trim();
+        if (!normalizedZodiacSign.length) {
+            return res.status(400).json({ message: 'Please select your zodiac sign.' });
+        }
         const existingByEmail = await (0, userService_1.findUserByEmail)(normalizedEmail);
         if (existingByEmail)
             return res.status(409).json({ message: 'Email already in use' });
@@ -114,29 +117,19 @@ async function register(req, res) {
             if (!trimmedPartner1Nickname.length) {
                 return res.status(400).json({ message: 'Nickname is required.' });
             }
+            const resolvedPartner2Nickname = trimmedPartner2Nickname.length > 0 ? trimmedPartner2Nickname : trimmedPartner1Nickname;
             const singleUser = await (0, userService_1.createSingleUser)({
                 email: normalizedEmail,
                 passwordHash: hash,
                 username: trimmedUsername,
+                partner1Nickname: trimmedPartner1Nickname,
+                partner2Nickname: resolvedPartner2Nickname,
+                country: trimmedCountry || null,
+                city: trimmedCity || null,
+                zodiacSign: normalizedZodiacSign,
             });
             const manualVerificationHints = [];
             const exposeVerificationTokens = shouldExposeVerificationTokens();
-            try {
-                await (0, singleMemberService_1.upsertSingleProfile)(singleUser.id, null, {
-                    preferredNickname: trimmedPartner1Nickname,
-                    contactEmail: normalizedEmail,
-                    country: trimmedCountry || null,
-                    city: trimmedCity || null,
-                    shortBio: null,
-                    interests: null,
-                    playPreferences: null,
-                    boundaries: null,
-                    availabilityJson: null,
-                });
-            }
-            catch (profileError) {
-                console.error('[auth/register] Failed to upsert single profile', profileError);
-            }
             let singleVerification = null;
             try {
                 singleVerification = await (0, emailService_1.sendVerificationEmail)(singleUser.id, normalizedEmail);
@@ -159,6 +152,8 @@ async function register(req, res) {
                     accountType: 'single',
                     primaryEmail: normalizedEmail,
                     username: trimmedUsername,
+                    partnerEmail: null,
+                    coupleType: 'SINGLE',
                     country: trimmedCountry || null,
                     city: trimmedCity || null,
                     userId: String(singleUser.id ?? ''),
@@ -197,6 +192,7 @@ async function register(req, res) {
             city: trimmedCity,
             partner1Nickname: trimmedPartner1Nickname,
             partner2Nickname: trimmedPartner2Nickname,
+            zodiacSign: normalizedZodiacSign,
         };
         const user = await (0, userService_1.createUser)(userPayload);
         const manualVerificationHints = [];
@@ -448,6 +444,7 @@ async function login(req, res) {
                 ? membershipStatus.membershipExpiryDate.toISOString()
                 : null,
             membershipDowngraded: membershipStatus.downgraded,
+            zodiacSign: user.zodiacSign ?? null,
         });
     }
     // Single-member login
@@ -458,26 +455,35 @@ async function login(req, res) {
             unverifiedUser: { id: user.id, email: user.email },
         });
     }
+    const membershipStatus = await (0, userService_1.refreshCoupleMembershipStatus)(String(user.id));
     const token = jsonwebtoken_1.default.sign({ id: String(user.id), kind: 'single' }, process.env.JWT_SECRET, {
         expiresIn: '7d',
     });
     res.cookie(COOKIE_NAME, token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-    const displayName = user.username ?? user.email ?? null;
+    const partner1Name = user.partner1Nickname?.trim()?.length ? user.partner1Nickname : user.username ?? user.email ?? null;
+    const partner2Name = user.partner2Nickname?.trim()?.length ? user.partner2Nickname : partner1Name;
     return res.status(200).json({
         id: String(user.id),
         email: user.email,
         username: user.username ?? null,
-        partnerEmail: null,
-        partner1Nickname: displayName,
-        partner2Nickname: null,
-        partner1Name: displayName,
-        partner2Name: null,
+        partnerEmail: user.partnerEmail ?? null,
+        partner1Nickname: partner1Name,
+        partner2Nickname: partner2Name,
+        partner1Name,
+        partner2Name,
         isEmailVerified: user.isEmailVerified ?? true,
         isPartnerEmailVerified: true,
         activePartnerKey: 'partner1',
-        activePartnerName: displayName,
+        activePartnerName: partner1Name,
         activePartnerEmail: user.email ?? null,
-        accountKind: 'single',
+        accountKind: 'couple',
+        isSingleAccount: true,
+        membershipType: membershipStatus.membershipType ?? null,
+        membershipExpiryDate: membershipStatus.membershipExpiryDate
+            ? membershipStatus.membershipExpiryDate.toISOString()
+            : null,
+        membershipDowngraded: membershipStatus.downgraded,
+        zodiacSign: user.zodiacSign ?? null,
     });
 }
 async function me(req, res) {

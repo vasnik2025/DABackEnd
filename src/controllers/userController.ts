@@ -105,6 +105,7 @@ type BasicUserInfo = {
   partnerEmail?: string | null;
   partner1Nickname?: string | null;
   partner2Nickname?: string | null;
+  zodiacSign?: string | null;
 };
 
 const loadBasicUserInfo = async (userId: string): Promise<BasicUserInfo | null> => {
@@ -119,7 +120,8 @@ const loadBasicUserInfo = async (userId: string): Promise<BasicUserInfo | null> 
           Username,
           PartnerEmail,
           Partner1Nickname,
-          Partner2Nickname
+          Partner2Nickname,
+          ZodiacSign
         FROM dbo.Users
         WHERE UserID = @UserID;
       `),
@@ -134,6 +136,7 @@ const loadBasicUserInfo = async (userId: string): Promise<BasicUserInfo | null> 
       partnerEmail: coupleRow.PartnerEmail ?? null,
       partner1Nickname: coupleRow.Partner1Nickname ?? null,
       partner2Nickname: coupleRow.Partner2Nickname ?? null,
+      zodiacSign: coupleRow.ZodiacSign ?? null,
     };
   }
 
@@ -183,6 +186,7 @@ const loadBasicUserInfo = async (userId: string): Promise<BasicUserInfo | null> 
         ? singleRow.PreferredNickname.trim()
         : null,
     partner2Nickname: null,
+    zodiacSign: null,
   };
 };
 
@@ -239,6 +243,7 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
              Users.IsOnline as isOnline,
              Users.City as city,
              Users.Country as country,
+             Users.ZodiacSign as zodiacSign,
              Users.IsEmailVerified as isEmailVerified,
              Users.CoupleType as coupleType,
              Users.PartnerEmail as partnerEmail,
@@ -310,6 +315,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
                Users.IsOnline as isOnline,
                Users.City as city,
                Users.Country as country,
+               Users.ZodiacSign as zodiacSign,
                Users.IsEmailVerified as isEmailVerified,
                Users.CoupleType as coupleType,
                Users.PartnerEmail as partnerEmail,

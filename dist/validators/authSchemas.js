@@ -3,6 +3,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.resendVerificationSchema = exports.registerSchema = exports.loginSchema = void 0;
 const zod_1 = require("zod");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
+const ZODIAC_SIGNS = [
+    'Aries',
+    'Taurus',
+    'Gemini',
+    'Cancer',
+    'Leo',
+    'Virgo',
+    'Libra',
+    'Scorpio',
+    'Sagittarius',
+    'Capricorn',
+    'Aquarius',
+    'Pisces',
+];
 // We validate *after* normalizing aliases to {email,password}
 exports.loginSchema = zod_1.z.object({
     body: zod_1.z.object({
@@ -12,9 +26,10 @@ exports.loginSchema = zod_1.z.object({
 });
 exports.registerSchema = zod_1.z.object({
     body: zod_1.z.object({
-        accountType: zod_1.z.enum(['single', 'couple']).default('couple'),
+        accountType: zod_1.z.enum(['single', 'couple']).default('single'),
         username: zod_1.z.string().min(1, 'Username is required.'),
         email: zod_1.z.string().email('Invalid email'),
+        zodiacSign: zod_1.z.enum(ZODIAC_SIGNS, { errorMap: () => ({ message: 'Please choose your zodiac sign.' }) }),
         password: zod_1.z
             .string()
             .min(passwordPolicy_1.PASSWORD_MIN_LENGTH, `Password must be at least ${passwordPolicy_1.PASSWORD_MIN_LENGTH} characters.`)

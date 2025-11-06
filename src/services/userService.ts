@@ -9,6 +9,7 @@ export type DbUser = {
   partner2Nickname?: string | null;
   coupleType?: string | null;
   accountKind?: string | null;
+  zodiacSign?: string | null;
   passwordHash?: string | null;
   isEmailVerified?: boolean;
   isPartnerEmailVerified?: boolean;
@@ -31,6 +32,7 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
         Partner2Nickname AS partner2Nickname,
         CoupleType AS coupleType,
         AccountKind AS accountKind,
+        ZodiacSign AS zodiacSign,
         PasswordHash AS passwordHash,
         ISNULL(IsEmailVerified, 0) AS isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) AS isPartnerEmailVerified
@@ -55,6 +57,7 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
       partner2Nickname: row.partner2Nickname ?? null,
       coupleType: row.coupleType ?? (isSingleAccount ? 'SINGLE' : null),
       accountKind: isSingleAccount ? 'single' : (row.accountKind ?? 'couple'),
+      zodiacSign: row.zodiacSign ?? null,
       passwordHash: row.passwordHash ?? null,
       isEmailVerified: Boolean(row.isEmailVerified),
       isPartnerEmailVerified: isSingleAccount ? true : Boolean(row.isPartnerEmailVerified),
@@ -85,6 +88,7 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
       partner1Nickname: null,
       partner2Nickname: null,
       coupleType: 'SINGLE',
+      zodiacSign: null,
       passwordHash: row.passwordHash ?? null,
       isEmailVerified: Boolean(row.isEmailVerified),
       isPartnerEmailVerified: true,
@@ -119,6 +123,7 @@ export async function findUserByUsernameOrEmail(
         Partner2Nickname AS partner2Nickname,
         CoupleType AS coupleType,
         AccountKind AS accountKind,
+        ZodiacSign AS zodiacSign,
         PasswordHash AS passwordHash,
         ISNULL(IsEmailVerified, 0) as isEmailVerified,
         ISNULL(IsPartnerEmailVerified, 0) as isPartnerEmailVerified
@@ -154,6 +159,7 @@ export async function findUserByUsernameOrEmail(
       partner2Nickname: record.partner2Nickname ?? null,
       coupleType: record.coupleType ?? (isSingleAccount ? 'SINGLE' : null),
       accountKind: isSingleAccount ? 'single' : (record.accountKind ?? 'couple'),
+      zodiacSign: record.zodiacSign ?? null,
       passwordHash: record.passwordHash ?? null,
       isEmailVerified: Boolean(record.isEmailVerified),
       isPartnerEmailVerified: isSingleAccount ? true : Boolean(record.isPartnerEmailVerified),
@@ -189,6 +195,7 @@ export async function findUserByUsernameOrEmail(
     partner2Nickname: null,
     coupleType: 'SINGLE',
     accountKind: 'single',
+    zodiacSign: null,
     passwordHash: single.passwordHash ?? null,
     isEmailVerified: Boolean(single.isEmailVerified),
     isPartnerEmailVerified: true,
@@ -322,6 +329,7 @@ export async function createUser(data: {
   city: string;
   partner1Nickname: string;
   partner2Nickname: string;
+  zodiacSign: string;
 }) {
   const pool = await getPool();
   const res = await pool.request()
@@ -334,19 +342,20 @@ export async function createUser(data: {
     .input('city', data.city)
     .input('partner1Nickname', data.partner1Nickname)
     .input('partner2Nickname', data.partner2Nickname)
+    .input('zodiacSign', sql.NVarChar(64), data.zodiacSign)
     .query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
         UserID, Email, PasswordHash, Username, CreatedAt,
-        PartnerEmail, CoupleType, Country, City, Partner1Nickname, Partner2Nickname,
+        PartnerEmail, CoupleType, Country, City, Partner1Nickname, Partner2Nickname, ZodiacSign,
         IsEmailVerified, IsPartnerEmailVerified
       )
       VALUES (
         @id, @email, @passwordHash, @username, SYSUTCDATETIME(),
-        @partnerEmail, @coupleType, @country, @city, @partner1Nickname, @partner2Nickname,
+        @partnerEmail, @coupleType, @country, @city, @partner1Nickname, @partner2Nickname, @zodiacSign,
         0, 0
       );
-      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
+      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email, @zodiacSign AS zodiacSign;
   `);
   return res.recordset[0];
 }
@@ -359,9 +368,11 @@ export async function createSingleUser(data: {
   partner2Nickname?: string | null;
   country?: string | null;
   city?: string | null;
+  zodiacSign: string;
 }) {
   const pool = await getPool();
   const normalizedEmail = data.email.toLowerCase();
+  const zodiac = data.zodiacSign?.trim?.() ?? 'SINGLE';
   const partner1Nickname =
     typeof data.partner1Nickname === 'string' && data.partner1Nickname.trim().length
       ? data.partner1Nickname.trim()
@@ -381,6 +392,7 @@ export async function createSingleUser(data: {
     .input('country', sql.NVarChar(255), data.country ?? null)
     .input('city', sql.NVarChar(255), data.city ?? null)
     .input('coupleType', sql.NVarChar(50), null)
+    .input('zodiacSign', sql.NVarChar(64), zodiac)
     .query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
@@ -396,6 +408,7 @@ export async function createSingleUser(data: {
         City,
         Partner1Nickname,
         Partner2Nickname,
+        ZodiacSign,
         IsEmailVerified,
         IsPartnerEmailVerified
       )
@@ -412,10 +425,11 @@ export async function createSingleUser(data: {
         @city,
         @partner1Nickname,
         @partner2Nickname,
+        @zodiacSign,
         0,
         1
       );
-      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
+      SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email, @zodiacSign AS zodiacSign;
     `);
   return res.recordset[0];
 }
