@@ -7,6 +7,7 @@ export type DbUser = {
   partnerEmail?: string | null;
   partner1Nickname?: string | null;
   partner2Nickname?: string | null;
+  coupleType?: string | null;
   passwordHash?: string | null;
   isEmailVerified?: boolean;
   isPartnerEmailVerified?: boolean;
@@ -23,17 +24,35 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
+        Username AS username,
+        LOWER(PartnerEmail) AS partnerEmail,
+        Partner1Nickname AS partner1Nickname,
+        Partner2Nickname AS partner2Nickname,
+        CoupleType AS coupleType,
         PasswordHash AS passwordHash,
-        IsEmailVerified AS isEmailVerified,
-        IsPartnerEmailVerified AS isPartnerEmailVerified
+        ISNULL(IsEmailVerified, 0) AS isEmailVerified,
+        ISNULL(IsPartnerEmailVerified, 0) AS isPartnerEmailVerified
       FROM Users
       WHERE LOWER(Email) = @email
     `);
   if (couple.recordset?.length) {
     const row = couple.recordset[0];
+    const coupleTypeValue =
+      typeof row.coupleType === 'string' ? row.coupleType.trim().toLowerCase() : '';
+    const isSingleAccount =
+      coupleTypeValue === 'single' || (!row.partnerEmail && coupleTypeValue.length === 0);
     return {
-      ...row,
-      kind: 'couple',
+      id: String(row.id),
+      email: String(row.email),
+      username: row.username ?? null,
+      partnerEmail: row.partnerEmail ?? null,
+      partner1Nickname: row.partner1Nickname ?? null,
+      partner2Nickname: row.partner2Nickname ?? null,
+      coupleType: row.coupleType ?? null,
+      passwordHash: row.passwordHash ?? null,
+      isEmailVerified: Boolean(row.isEmailVerified),
+      isPartnerEmailVerified: isSingleAccount ? true : Boolean(row.isPartnerEmailVerified),
+      kind: isSingleAccount ? 'single' : 'couple',
     };
   }
 
@@ -44,15 +63,24 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
+        Username AS username,
         PasswordHash AS passwordHash,
-        IsEmailVerified AS isEmailVerified
+        ISNULL(IsEmailVerified, 0) AS isEmailVerified
       FROM SingleUsers
       WHERE LOWER(Email) = @email
     `);
   if (single.recordset?.length) {
     const row = single.recordset[0];
     return {
-      ...row,
+      id: String(row.id),
+      email: String(row.email ?? ''),
+      username: row.username ?? null,
+      partnerEmail: null,
+      partner1Nickname: null,
+      partner2Nickname: null,
+      coupleType: 'SINGLE',
+      passwordHash: row.passwordHash ?? null,
+      isEmailVerified: Boolean(row.isEmailVerified),
       isPartnerEmailVerified: true,
       kind: 'single',
     };
@@ -83,9 +111,10 @@ export async function findUserByUsernameOrEmail(
         LOWER(PartnerEmail) AS partnerEmail,
         Partner1Nickname AS partner1Nickname,
         Partner2Nickname AS partner2Nickname,
+        CoupleType AS coupleType,
         PasswordHash AS passwordHash,
-        IsEmailVerified as isEmailVerified,
-        IsPartnerEmailVerified as isPartnerEmailVerified
+        ISNULL(IsEmailVerified, 0) as isEmailVerified,
+        ISNULL(IsPartnerEmailVerified, 0) as isPartnerEmailVerified
       FROM Users
       WHERE (LOWER(Email) = @usernameOrEmail)
          OR (PartnerEmail IS NOT NULL AND LOWER(PartnerEmail) = @usernameOrEmail)
@@ -101,8 +130,25 @@ export async function findUserByUsernameOrEmail(
         : normalized === emailLower
           ? emailLower
           : normalized;
+    const coupleTypeValue =
+      typeof record.coupleType === 'string' ? record.coupleType.trim().toLowerCase() : '';
+    const isSingleAccount =
+      coupleTypeValue === 'single' || (!record.partnerEmail && coupleTypeValue.length === 0);
 
-    return { ...record, activeLoginEmail, kind: 'couple' };
+    return {
+      id: String(record.id),
+      email: String(record.email ?? ''),
+      username: record.username ?? null,
+      partnerEmail: record.partnerEmail ?? null,
+      partner1Nickname: record.partner1Nickname ?? null,
+      partner2Nickname: record.partner2Nickname ?? null,
+      coupleType: record.coupleType ?? null,
+      passwordHash: record.passwordHash ?? null,
+      isEmailVerified: Boolean(record.isEmailVerified),
+      isPartnerEmailVerified: isSingleAccount ? true : Boolean(record.isPartnerEmailVerified),
+      activeLoginEmail,
+      kind: isSingleAccount ? 'single' : 'couple',
+    };
   }
 
   const singleResult = await pool
@@ -124,12 +170,17 @@ export async function findUserByUsernameOrEmail(
   if (!single) return null;
 
   return {
-    ...single,
+    id: String(single.id),
+    email: String(single.email ?? ''),
+    username: single.username ?? null,
     partnerEmail: null,
     partner1Nickname: null,
     partner2Nickname: null,
+    coupleType: 'SINGLE',
+    passwordHash: single.passwordHash ?? null,
+    isEmailVerified: Boolean(single.isEmailVerified),
     isPartnerEmailVerified: true,
-    activeLoginEmail: single.email,
+    activeLoginEmail: single.email ?? undefined,
     kind: 'single',
   };
 }
@@ -292,33 +343,70 @@ export async function createSingleUser(data: {
   email: string;
   passwordHash: string;
   username: string;
+  partner1Nickname: string;
+  partner2Nickname?: string | null;
+  country?: string | null;
+  city?: string | null;
+  coupleType?: string | null;
 }) {
   const pool = await getPool();
-  const res = await pool.request()
-    .input('email', sql.NVarChar(320), data.email.toLowerCase())
+  const normalizedEmail = data.email.toLowerCase();
+  const normalizedCoupleType =
+    typeof data.coupleType === 'string' && data.coupleType.trim().length
+      ? data.coupleType.trim().toUpperCase()
+      : 'SINGLE';
+  const partner1Nickname =
+    typeof data.partner1Nickname === 'string' && data.partner1Nickname.trim().length
+      ? data.partner1Nickname.trim()
+      : data.username;
+  const partner2Nickname =
+    typeof data.partner2Nickname === 'string' && data.partner2Nickname.trim().length
+      ? data.partner2Nickname.trim()
+      : partner1Nickname;
+
+  const res = await pool
+    .request()
+    .input('email', sql.NVarChar(320), normalizedEmail)
     .input('passwordHash', sql.NVarChar(255), data.passwordHash)
     .input('username', sql.NVarChar(255), data.username)
+    .input('partner1Nickname', sql.NVarChar(255), partner1Nickname)
+    .input('partner2Nickname', sql.NVarChar(255), partner2Nickname)
+    .input('country', sql.NVarChar(255), data.country ?? null)
+    .input('city', sql.NVarChar(255), data.city ?? null)
+    .input('coupleType', sql.NVarChar(50), normalizedCoupleType)
     .query(`
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
-      INSERT INTO SingleUsers (
+      INSERT INTO Users (
         UserID,
         Email,
-        Username,
         PasswordHash,
-        InviteSourceUserID,
+        Username,
         CreatedAt,
-        UpdatedAt,
-        IsEmailVerified
+        AccountKind,
+        PartnerEmail,
+        CoupleType,
+        Country,
+        City,
+        Partner1Nickname,
+        Partner2Nickname,
+        IsEmailVerified,
+        IsPartnerEmailVerified
       )
       VALUES (
         @id,
         @email,
-        @username,
         @passwordHash,
+        @username,
+        SYSUTCDATETIME(),
+        'couple',
         NULL,
-        SYSUTCDATETIME(),
-        SYSUTCDATETIME(),
-        0
+        @coupleType,
+        @country,
+        @city,
+        @partner1Nickname,
+        @partner2Nickname,
+        0,
+        1
       );
       SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email;
     `);

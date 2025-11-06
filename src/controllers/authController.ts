@@ -24,7 +24,6 @@ import {
   verifyRequestAndIssueResetToken,
   getRequestByResetToken,
 } from '../services/passwordResetService';
-import { upsertSingleProfile } from '../services/singleMemberService';
 import {
   sendVerificationEmail,
   sendPartnerVerificationEmail,
@@ -192,30 +191,20 @@ export async function register(req: Request, res: Response) {
         return res.status(400).json({ message: 'Nickname is required.' });
       }
 
+      const resolvedPartner2Nickname =
+        trimmedPartner2Nickname.length > 0 ? trimmedPartner2Nickname : trimmedPartner1Nickname;
       const singleUser = await createSingleUser({
         email: normalizedEmail,
         passwordHash: hash,
         username: trimmedUsername,
+        partner1Nickname: trimmedPartner1Nickname,
+        partner2Nickname: resolvedPartner2Nickname,
+        country: trimmedCountry || null,
+        city: trimmedCity || null,
       });
 
       const manualVerificationHints: ManualVerificationHint[] = [];
       const exposeVerificationTokens = shouldExposeVerificationTokens();
-
-      try {
-        await upsertSingleProfile(singleUser.id, null, {
-          preferredNickname: trimmedPartner1Nickname,
-          contactEmail: normalizedEmail,
-          country: trimmedCountry || null,
-          city: trimmedCity || null,
-          shortBio: null,
-          interests: null,
-          playPreferences: null,
-          boundaries: null,
-          availabilityJson: null,
-        });
-      } catch (profileError) {
-        console.error('[auth/register] Failed to upsert single profile', profileError);
-      }
 
       let singleVerification: VerificationEmailResult | null = null;
       try {
@@ -245,6 +234,8 @@ export async function register(req: Request, res: Response) {
           accountType: 'single',
           primaryEmail: normalizedEmail,
           username: trimmedUsername,
+          partnerEmail: null,
+          coupleType: 'SINGLE',
           country: trimmedCountry || null,
           city: trimmedCity || null,
           userId: String(singleUser.id ?? ''),
@@ -597,28 +588,39 @@ export async function login(req: Request, res: Response) {
     });
   }
 
+  const membershipStatus = await refreshCoupleMembershipStatus(String(user.id));
+
   const token = jwt.sign({ id: String(user.id), kind: 'single' }, process.env.JWT_SECRET as string, {
     expiresIn: '7d',
   });
   res.cookie(COOKIE_NAME, token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-  const displayName = user.username ?? user.email ?? null;
+  const partner1Name =
+    user.partner1Nickname?.trim()?.length ? user.partner1Nickname : user.username ?? user.email ?? null;
+  const partner2Name =
+    user.partner2Nickname?.trim()?.length ? user.partner2Nickname : partner1Name;
 
   return res.status(200).json({
     id: String(user.id),
     email: user.email,
     username: user.username ?? null,
-    partnerEmail: null,
-    partner1Nickname: displayName,
-    partner2Nickname: null,
-    partner1Name: displayName,
-    partner2Name: null,
+    partnerEmail: user.partnerEmail ?? null,
+    partner1Nickname: partner1Name,
+    partner2Nickname: partner2Name,
+    partner1Name,
+    partner2Name,
     isEmailVerified: user.isEmailVerified ?? true,
     isPartnerEmailVerified: true,
     activePartnerKey: 'partner1',
-    activePartnerName: displayName,
+    activePartnerName: partner1Name,
     activePartnerEmail: user.email ?? null,
-    accountKind: 'single',
+    accountKind: 'couple',
+    isSingleAccount: true,
+    membershipType: membershipStatus.membershipType ?? null,
+    membershipExpiryDate: membershipStatus.membershipExpiryDate
+      ? membershipStatus.membershipExpiryDate.toISOString()
+      : null,
+    membershipDowngraded: membershipStatus.downgraded,
   });
 }
 

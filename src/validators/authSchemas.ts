@@ -15,7 +15,7 @@ export const loginSchema = z.object({
 
 export const registerSchema = z.object({
   body: z.object({
-    accountType: z.enum(['single', 'couple']).default('couple'),
+    accountType: z.enum(['single', 'couple']).default('single'),
     username: z.string().min(1, 'Username is required.'),
     email: z.string().email('Invalid email'),
     password: z
