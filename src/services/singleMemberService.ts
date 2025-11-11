@@ -1729,6 +1729,8 @@ export type ActiveSingleSummary = {
   nickname: string | null;
   role: RequestedRole | null;
   inviterDisplayName: string | null;
+  profileCountry: string | null;
+  profileCity: string | null;
   inviterCity: string | null;
   inviterCountry: string | null;
   invitedAt: Date | null;
@@ -1762,6 +1764,8 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
           inviter.Partner2Nickname,
           inviter.City AS InviterCity,
           inviter.Country AS InviterCountry,
+          sp.Country AS ProfileCountry,
+          sp.City AS ProfileCity,
           ROW_NUMBER() OVER (PARTITION BY su.UserID ORDER BY inv.CreatedAt DESC) AS RowRank
         FROM dbo.SingleUsers su
         INNER JOIN dbo.SingleProfiles sp ON sp.UserID = su.UserID
@@ -1793,7 +1797,7 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
         AND (
           @Country IS NULL
           OR LTRIM(RTRIM(@Country)) = ''
-          OR rs.InviterCountry = @Country
+          OR LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, ''))) = LTRIM(RTRIM(@Country))
         );
     `);
   });
@@ -1816,6 +1820,8 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
       nickname: row.PreferredNickname ?? null,
       role: row.RequestedRole ?? null,
       inviterDisplayName,
+      profileCountry: row.ProfileCountry ?? null,
+      profileCity: row.ProfileCity ?? null,
       inviterCity: row.InviterCity ?? null,
       inviterCountry: row.InviterCountry ?? null,
       invitedAt: row.InvitedAt ?? null,
