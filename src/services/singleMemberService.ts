@@ -1729,6 +1729,7 @@ export type ActiveSingleSummary = {
   nickname: string | null;
   role: RequestedRole | null;
   inviterDisplayName: string | null;
+  inviterCity: string | null;
   inviterCountry: string | null;
   invitedAt: Date | null;
   reputationScore: number | null;
@@ -1759,6 +1760,7 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
           inviter.Username AS InviterUsername,
           inviter.Partner1Nickname,
           inviter.Partner2Nickname,
+          inviter.City AS InviterCity,
           inviter.Country AS InviterCountry,
           ROW_NUMBER() OVER (PARTITION BY su.UserID ORDER BY inv.CreatedAt DESC) AS RowRank
         FROM dbo.SingleUsers su
@@ -1814,6 +1816,7 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
       nickname: row.PreferredNickname ?? null,
       role: row.RequestedRole ?? null,
       inviterDisplayName,
+      inviterCity: row.InviterCity ?? null,
       inviterCountry: row.InviterCountry ?? null,
       invitedAt: row.InvitedAt ?? null,
       reputationScore:
