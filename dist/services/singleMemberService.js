@@ -1360,14 +1360,17 @@ async function fetchSingleProfile(userId) {
     };
 }
 async function listActiveSinglesByCountry(country) {
-    const normalizedCountry = typeof country === 'string' ? country.trim() : '';
+    const rawCountry = typeof country === 'string' ? country.trim() : '';
+    const normalizedCountry = rawCountry.toUpperCase();
     const result = await (0, db_1.withSqlRetry)((pool) => {
         const request = pool.request();
         if (normalizedCountry.length) {
-            request.input('Country', db_1.sql.NVarChar(120), normalizedCountry);
+            request.input('CountryUpper', db_1.sql.NVarChar(120), normalizedCountry);
+            request.input('CountryPattern', db_1.sql.NVarChar(240), `%${normalizedCountry}%`);
         }
         else {
-            request.input('Country', db_1.sql.NVarChar(120), null);
+            request.input('CountryUpper', db_1.sql.NVarChar(120), null);
+            request.input('CountryPattern', db_1.sql.NVarChar(240), null);
         }
         return request.query(`
       WITH RankedSingles AS (
@@ -1388,8 +1391,6 @@ async function listActiveSinglesByCountry(country) {
           inviter.Country AS InviterCountry,
           sp.Country AS ProfileCountry,
           sp.City AS ProfileCity,
-          su.Country AS SingleUserCountry,
-          su.City AS SingleUserCity,
           ROW_NUMBER() OVER (PARTITION BY su.UserID ORDER BY inv.CreatedAt DESC) AS RowRank
         FROM dbo.SingleUsers su
         INNER JOIN dbo.SingleProfiles sp ON sp.UserID = su.UserID
@@ -1409,8 +1410,6 @@ async function listActiveSinglesByCountry(country) {
         rs.InviterCity,
         rs.ProfileCountry,
         rs.ProfileCity,
-        rs.SingleUserCountry,
-        rs.SingleUserCity,
         rs.ReputationScore,
         photo.DataUrl AS PhotoDataUrl
       FROM RankedSingles rs
@@ -1424,10 +1423,13 @@ async function listActiveSinglesByCountry(country) {
         AND rs.RequestedRole IN ('single_male', 'single_female')
         AND rs.Status IN ('awaiting_couple', 'completed')
         AND (
-          @Country IS NULL
-          OR LTRIM(RTRIM(@Country)) = ''
-          OR UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, rs.SingleUserCountry, '')))) =
-            UPPER(LTRIM(RTRIM(@Country)))
+          @CountryUpper IS NULL
+          OR @CountryUpper = ''
+          OR UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, '')))) = @CountryUpper
+          OR (
+            @CountryPattern IS NOT NULL
+            AND UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, '')))) LIKE @CountryPattern
+          )
         );
     `);
     });
@@ -1444,14 +1446,16 @@ async function listActiveSinglesByCountry(country) {
         else if (row.InviterUsername) {
             inviterDisplayName = String(row.InviterUsername);
         }
+        const derivedCountry = row.ProfileCountry ?? row.InviterCountry ?? null;
+        const derivedCity = row.ProfileCity ?? row.InviterCity ?? null;
         return {
             userId: String(row.UserID),
             username: row.Username ?? null,
             nickname: row.PreferredNickname ?? null,
             role: row.RequestedRole ?? null,
             inviterDisplayName,
-            profileCountry: row.ProfileCountry ?? row.SingleUserCountry ?? null,
-            profileCity: row.ProfileCity ?? row.SingleUserCity ?? null,
+            profileCountry: derivedCountry,
+            profileCity: derivedCity,
             inviterCity: row.InviterCity ?? null,
             inviterCountry: row.InviterCountry ?? null,
             invitedAt: row.InvitedAt ?? null,
