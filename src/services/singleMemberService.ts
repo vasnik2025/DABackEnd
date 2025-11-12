@@ -1766,6 +1766,8 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
           inviter.Country AS InviterCountry,
           sp.Country AS ProfileCountry,
           sp.City AS ProfileCity,
+          su.Country AS SingleUserCountry,
+          su.City AS SingleUserCity,
           ROW_NUMBER() OVER (PARTITION BY su.UserID ORDER BY inv.CreatedAt DESC) AS RowRank
         FROM dbo.SingleUsers su
         INNER JOIN dbo.SingleProfiles sp ON sp.UserID = su.UserID
@@ -1782,6 +1784,11 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
         rs.Partner1Nickname,
         rs.Partner2Nickname,
         rs.InviterCountry,
+        rs.InviterCity,
+        rs.ProfileCountry,
+        rs.ProfileCity,
+        rs.SingleUserCountry,
+        rs.SingleUserCity,
         rs.ReputationScore,
         photo.DataUrl AS PhotoDataUrl
       FROM RankedSingles rs
@@ -1797,7 +1804,8 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
         AND (
           @Country IS NULL
           OR LTRIM(RTRIM(@Country)) = ''
-          OR LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, ''))) = LTRIM(RTRIM(@Country))
+          OR UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, rs.SingleUserCountry, '')))) =
+            UPPER(LTRIM(RTRIM(@Country)))
         );
     `);
   });
@@ -1820,8 +1828,8 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
       nickname: row.PreferredNickname ?? null,
       role: row.RequestedRole ?? null,
       inviterDisplayName,
-      profileCountry: row.ProfileCountry ?? null,
-      profileCity: row.ProfileCity ?? null,
+      profileCountry: row.ProfileCountry ?? row.SingleUserCountry ?? null,
+      profileCity: row.ProfileCity ?? row.SingleUserCity ?? null,
       inviterCity: row.InviterCity ?? null,
       inviterCountry: row.InviterCountry ?? null,
       invitedAt: row.InvitedAt ?? null,

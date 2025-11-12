@@ -1384,7 +1384,12 @@ async function listActiveSinglesByCountry(country) {
           inviter.Username AS InviterUsername,
           inviter.Partner1Nickname,
           inviter.Partner2Nickname,
+          inviter.City AS InviterCity,
           inviter.Country AS InviterCountry,
+          sp.Country AS ProfileCountry,
+          sp.City AS ProfileCity,
+          su.Country AS SingleUserCountry,
+          su.City AS SingleUserCity,
           ROW_NUMBER() OVER (PARTITION BY su.UserID ORDER BY inv.CreatedAt DESC) AS RowRank
         FROM dbo.SingleUsers su
         INNER JOIN dbo.SingleProfiles sp ON sp.UserID = su.UserID
@@ -1401,6 +1406,11 @@ async function listActiveSinglesByCountry(country) {
         rs.Partner1Nickname,
         rs.Partner2Nickname,
         rs.InviterCountry,
+        rs.InviterCity,
+        rs.ProfileCountry,
+        rs.ProfileCity,
+        rs.SingleUserCountry,
+        rs.SingleUserCity,
         rs.ReputationScore,
         photo.DataUrl AS PhotoDataUrl
       FROM RankedSingles rs
@@ -1416,7 +1426,8 @@ async function listActiveSinglesByCountry(country) {
         AND (
           @Country IS NULL
           OR LTRIM(RTRIM(@Country)) = ''
-          OR rs.InviterCountry = @Country
+          OR UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, rs.SingleUserCountry, '')))) =
+            UPPER(LTRIM(RTRIM(@Country)))
         );
     `);
     });
@@ -1439,6 +1450,9 @@ async function listActiveSinglesByCountry(country) {
             nickname: row.PreferredNickname ?? null,
             role: row.RequestedRole ?? null,
             inviterDisplayName,
+            profileCountry: row.ProfileCountry ?? row.SingleUserCountry ?? null,
+            profileCity: row.ProfileCity ?? row.SingleUserCity ?? null,
+            inviterCity: row.InviterCity ?? null,
             inviterCountry: row.InviterCountry ?? null,
             invitedAt: row.InvitedAt ?? null,
             reputationScore: typeof row.ReputationScore === 'number' ? Number(row.ReputationScore) : null,
