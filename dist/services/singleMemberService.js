@@ -1377,19 +1377,18 @@ async function listActiveSinglesByCountry(country) {
         SELECT
           u.UserID,
           u.Username,
-          u.Partner1Nickname,
+          COALESCE(u.DisplayName, u.Partner1Nickname, u.Partner2Nickname) AS PreferredNickname,
           u.City,
           u.Country,
           u.Gender,
           u.CreatedAt,
           u.UpdatedAt
         FROM dbo.Users u
-        WHERE u.AccountKind = 'single'
-      )
+     )
       SELECT
         s.UserID,
         s.Username,
-        s.Partner1Nickname,
+        s.PreferredNickname,
         s.City,
         s.Country,
         s.Gender,
@@ -1426,7 +1425,7 @@ async function listActiveSinglesByCountry(country) {
         return null;
     };
     return (result.recordset ?? []).map((row) => {
-        const nickname = row.Partner1Nickname ?? row.Username ?? null;
+        const nickname = row.PreferredNickname ?? row.Username ?? null;
         return {
             userId: String(row.UserID),
             username: row.Username ?? null,
