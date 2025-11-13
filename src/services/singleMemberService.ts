@@ -1756,7 +1756,7 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
         SELECT
           u.UserID,
           u.Username,
-          COALESCE(u.DisplayName, u.Partner1Nickname, u.Partner2Nickname) AS PreferredNickname,
+          COALESCE(u.Partner1Nickname, u.Partner2Nickname, u.Username) AS PreferredNickname,
           u.City,
           u.Country,
           u.Gender,
