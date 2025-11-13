@@ -1750,96 +1750,73 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
       request.input('CountryUpper', sql.NVarChar(120), null);
       request.input('CountryPattern', sql.NVarChar(240), null);
     }
+
     return request.query(`
-      WITH RankedSingles AS (
+      WITH Singles AS (
         SELECT
-          su.UserID,
-          su.Username,
-          sp.PreferredNickname,
-          sp.ReputationSummary,
-          sp.ReputationScore,
-          inv.RequestedRole,
-          inv.Status,
-          inv.CreatedAt AS InvitedAt,
-          inviter.UserID AS InviterUserID,
-          inviter.Username AS InviterUsername,
-          inviter.Partner1Nickname,
-          inviter.Partner2Nickname,
-          inviter.City AS InviterCity,
-          inviter.Country AS InviterCountry,
-          sp.Country AS ProfileCountry,
-          sp.City AS ProfileCity,
-          ROW_NUMBER() OVER (PARTITION BY su.UserID ORDER BY inv.CreatedAt DESC) AS RowRank
-        FROM dbo.SingleUsers su
-        INNER JOIN dbo.SingleProfiles sp ON sp.UserID = su.UserID
-        LEFT JOIN dbo.SingleInvites inv ON inv.InviteeUserID = su.UserID
-        LEFT JOIN dbo.Users inviter ON inviter.UserID = su.InviteSourceUserID
+          u.UserID,
+          u.Username,
+          u.Partner1Nickname,
+          u.City,
+          u.Country,
+          u.Gender,
+          u.CreatedAt,
+          u.UpdatedAt
+        FROM dbo.Users u
+        WHERE u.AccountKind = 'single'
       )
       SELECT
-        rs.UserID,
-        rs.Username,
-        rs.PreferredNickname,
-        rs.RequestedRole,
-        rs.InvitedAt,
-        rs.InviterUsername,
-        rs.Partner1Nickname,
-        rs.Partner2Nickname,
-        rs.InviterCountry,
-        rs.InviterCity,
-        rs.ProfileCountry,
-        rs.ProfileCity,
-        rs.ReputationScore,
+        s.UserID,
+        s.Username,
+        s.Partner1Nickname,
+        s.City,
+        s.Country,
+        s.Gender,
+        s.CreatedAt,
         photo.DataUrl AS PhotoDataUrl
-      FROM RankedSingles rs
+      FROM Singles s
       OUTER APPLY (
         SELECT TOP 1 DataUrl
-        FROM dbo.SinglePhotos sp
-        WHERE sp.UserID = rs.UserID
-        ORDER BY sp.UploadedAt ASC
+        FROM dbo.Photos p
+        WHERE p.UserID = s.UserID
+        ORDER BY COALESCE(p.IsPrimary, 0) DESC, p.UploadedAt DESC
       ) AS photo
-      WHERE rs.RowRank = 1
-        AND rs.RequestedRole IN ('single_male', 'single_female')
-        AND rs.Status IN ('awaiting_couple', 'completed')
-        AND (
-          @CountryUpper IS NULL
-          OR @CountryUpper = ''
-          OR UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, '')))) = @CountryUpper
-          OR (
-            @CountryPattern IS NOT NULL
-            AND UPPER(LTRIM(RTRIM(COALESCE(rs.ProfileCountry, rs.InviterCountry, '')))) LIKE @CountryPattern
-          )
-        );
+      WHERE (
+        @CountryUpper IS NULL
+        OR @CountryUpper = ''
+        OR UPPER(LTRIM(RTRIM(COALESCE(s.Country, '')))) = @CountryUpper
+        OR (
+          @CountryPattern IS NOT NULL
+          AND UPPER(LTRIM(RTRIM(COALESCE(s.Country, '')))) LIKE @CountryPattern
+        )
+      );
     `);
   });
 
-  return (result.recordset ?? []).map((row: any) => {
-    const partner1 = row.Partner1Nickname ? String(row.Partner1Nickname) : null;
-    const partner2 = row.Partner2Nickname ? String(row.Partner2Nickname) : null;
-    let inviterDisplayName: string | null = null;
-    if (partner1 && partner2) {
-      inviterDisplayName = `${partner1} & ${partner2}`;
-    } else if (partner1 || partner2) {
-      inviterDisplayName = partner1 ?? partner2;
-    } else if (row.InviterUsername) {
-      inviterDisplayName = String(row.InviterUsername);
-    }
+  const mapGenderToRole = (value?: string | null): RequestedRole | null => {
+    if (!value) return null;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized.length) return null;
+    if (normalized.startsWith('m')) return 'single_male';
+    if (normalized.startsWith('f')) return 'single_female';
+    return null;
+  };
 
-    const derivedCountry = row.ProfileCountry ?? row.InviterCountry ?? null;
-    const derivedCity = row.ProfileCity ?? row.InviterCity ?? null;
+  return (result.recordset ?? []).map((row: any) => {
+    const nickname = row.Partner1Nickname ?? row.Username ?? null;
 
     return {
       userId: String(row.UserID),
       username: row.Username ?? null,
-      nickname: row.PreferredNickname ?? null,
-      role: row.RequestedRole ?? null,
-      inviterDisplayName,
-      profileCountry: derivedCountry,
-      profileCity: derivedCity,
-      inviterCity: row.InviterCity ?? null,
-      inviterCountry: row.InviterCountry ?? null,
-      invitedAt: row.InvitedAt ?? null,
-      reputationScore:
-        typeof row.ReputationScore === 'number' ? Number(row.ReputationScore) : null,
+      nickname,
+      role: mapGenderToRole(row.Gender ?? null),
+      inviterDisplayName: null,
+      profileCountry: row.Country ?? null,
+      profileCity: row.City ?? null,
+      inviterCity: null,
+      inviterCountry: null,
+      invitedAt: row.CreatedAt ?? null,
+      reputationScore: null,
       photoDataUrl: row.PhotoDataUrl ?? null,
     };
   });
