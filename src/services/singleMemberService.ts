@@ -1779,7 +1779,7 @@ export async function listActiveSinglesByCountry(country?: string | null): Promi
         SELECT TOP 1 DataUrl
         FROM dbo.Photos p
         WHERE p.UserID = s.UserID
-        ORDER BY COALESCE(p.IsPrimary, 0) DESC, p.UploadedAt DESC
+        ORDER BY p.UploadedAt DESC
       ) AS photo
       WHERE (
         @CountryUpper IS NULL

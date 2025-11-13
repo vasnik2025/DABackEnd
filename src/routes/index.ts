@@ -21,6 +21,7 @@ import adminFakeUserRoutes from './adminFakeUserRoutes';
 import adminFakeChatRoutes from './adminFakeChatRoutes';
 import adminPhotoGalleryRoutes from './adminPhotoGalleryRoutes';
 import voiceMessageRoutes from './voiceMessageRoutes';
+import aiRoutes from './aiRoutes';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.use('/voice-messages', voiceMessageRoutes);
 router.use('/location-beacons', locationBeaconRoutes);
 router.use('/splash', splashSurveyRoutes);
 router.use('/singles', singleRoutes);
+router.use('/ai', aiRoutes);
 router.use('/monitoring', adminMonitoringRoutes);
 router.use('/admin/reengagement', adminReengagementRoutes);
 router.use('/admin/fake-users', adminFakeUserRoutes);
