@@ -30,9 +30,12 @@ export const getNotifications = async (req: Request, res: Response, next: NextFu
         VM.RecipientUserID AS voiceRecipientUserID,
         VM.Status AS voiceMessageStatus
       FROM Notifications N
+      OUTER APPLY (
+        SELECT TRY_CONVERT(uniqueidentifier, N.EntityID) AS EntityGuid
+      ) CE
       LEFT JOIN Users U ON U.UserID = N.SourceUserID
-      LEFT JOIN DirectMessages DM ON DM.MessageID = TRY_CONVERT(uniqueidentifier, N.EntityID)
-      LEFT JOIN VoiceMessages VM ON VM.VoiceMessageID = TRY_CONVERT(uniqueidentifier, N.EntityID)
+      LEFT JOIN DirectMessages DM ON CE.EntityGuid IS NOT NULL AND DM.MessageID = CE.EntityGuid
+      LEFT JOIN VoiceMessages VM ON CE.EntityGuid IS NOT NULL AND VM.VoiceMessageID = CE.EntityGuid
       WHERE N.UserID = @UserID
       ORDER BY N.CreatedAt DESC
     `;
