@@ -30,8 +30,8 @@ const getNotifications = async (req, res, next) => {
         VM.Status AS voiceMessageStatus
       FROM Notifications N
       LEFT JOIN Users U ON U.UserID = N.SourceUserID
-      LEFT JOIN DirectMessages DM ON DM.MessageID = N.EntityID
-      LEFT JOIN VoiceMessages VM ON VM.VoiceMessageID = N.EntityID
+      LEFT JOIN DirectMessages DM ON DM.MessageID = TRY_CONVERT(uniqueidentifier, N.EntityID)
+      LEFT JOIN VoiceMessages VM ON VM.VoiceMessageID = TRY_CONVERT(uniqueidentifier, N.EntityID)
       WHERE N.UserID = @UserID
       ORDER BY N.CreatedAt DESC
     `;
