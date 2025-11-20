@@ -14,6 +14,8 @@ export interface User {
   isOnline?: boolean;
   city?: string | null;
   country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   isEmailVerified?: boolean;
   viber?: string | null;
   isViberPublic?: boolean;
@@ -61,6 +63,8 @@ export interface UserUpdatePayload {
   isOnline?: boolean;
   city?: string | null;
   country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   newPassword?: string;
   currentPassword?: string;
 

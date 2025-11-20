@@ -32,6 +32,7 @@ import {
   sendPasswordResetLinkEmail,
   sendAdminNewMemberNotificationEmail,
 } from '../utils/emailService';
+import { geocodeCityCountry } from '../utils/geocoding';
 import type { VerificationEmailResult } from '../utils/emailService';
 import { insertPasswordShareRecord } from '../utils/passwordShare';
 import {
@@ -179,6 +180,10 @@ export async function register(req: Request, res: Response) {
     const trimmedCountry = country.trim();
     const trimmedCity = city.trim();
     const normalizedZodiacSign = zodiacSign.trim();
+    let resolvedCoordinates: { latitude: number; longitude: number } | null = null;
+    if (trimmedCity || trimmedCountry) {
+      resolvedCoordinates = await geocodeCityCountry(trimmedCity || null, trimmedCountry || null);
+    }
 
     if (!normalizedZodiacSign.length) {
       return res.status(400).json({ message: 'Please select your zodiac sign.' });
@@ -208,6 +213,8 @@ export async function register(req: Request, res: Response) {
         country: trimmedCountry || null,
         city: trimmedCity || null,
         zodiacSign: normalizedZodiacSign,
+        latitude: resolvedCoordinates?.latitude ?? null,
+        longitude: resolvedCoordinates?.longitude ?? null,
       });
 
       const manualVerificationHints: ManualVerificationHint[] = [];
@@ -275,16 +282,18 @@ export async function register(req: Request, res: Response) {
     }
 
     const userPayload = {
-        email: normalizedEmail,
-        passwordHash: hash,
-        username: trimmedUsername,
-        partnerEmail: normalizedPartnerEmail,
-        coupleType: coupleType ?? null,
-        country: trimmedCountry,
-        city: trimmedCity,
-        partner1Nickname: trimmedPartner1Nickname,
-        partner2Nickname: trimmedPartner2Nickname,
-        zodiacSign: normalizedZodiacSign,
+      email: normalizedEmail,
+      passwordHash: hash,
+      username: trimmedUsername,
+      partnerEmail: normalizedPartnerEmail,
+      coupleType: coupleType ?? null,
+      country: trimmedCountry,
+      city: trimmedCity,
+      partner1Nickname: trimmedPartner1Nickname,
+      partner2Nickname: trimmedPartner2Nickname,
+      zodiacSign: normalizedZodiacSign,
+      latitude: resolvedCoordinates?.latitude ?? null,
+      longitude: resolvedCoordinates?.longitude ?? null,
     };
     
     const user = await createUser(userPayload);

@@ -281,21 +281,23 @@ export async function refreshCoupleMembershipStatus(userId) {
     };
 }
 export async function createUser(data) {
-    const pool = await getPool();
-    const supportsZodiac = await usersTableSupportsZodiacSign(pool);
-    const request = pool.request()
-        .input('email', data.email.toLowerCase())
-        .input('passwordHash', data.passwordHash)
-        .input('username', data.username)
-        .input('partnerEmail', data.partnerEmail ? data.partnerEmail.toLowerCase() : null)
-        .input('coupleType', typeof data.coupleType === 'string' ? data.coupleType.toUpperCase() : null)
-        .input('country', data.country)
-        .input('city', data.city)
-        .input('partner1Nickname', data.partner1Nickname)
-        .input('partner2Nickname', data.partner2Nickname);
-    if (supportsZodiac) {
-        request.input('zodiacSign', sql.NVarChar(64), data.zodiacSign);
-    }
+  const pool = await getPool();
+  const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+  const request = pool.request()
+    .input('email', data.email.toLowerCase())
+    .input('passwordHash', data.passwordHash)
+    .input('username', data.username)
+    .input('partnerEmail', data.partnerEmail ? data.partnerEmail.toLowerCase() : null)
+    .input('coupleType', typeof data.coupleType === 'string' ? data.coupleType.toUpperCase() : null)
+    .input('country', data.country)
+    .input('city', data.city)
+    .input('latitude', sql.Decimal(9, 6), data.latitude ?? null)
+    .input('longitude', sql.Decimal(9, 6), data.longitude ?? null)
+    .input('partner1Nickname', data.partner1Nickname)
+    .input('partner2Nickname', data.partner2Nickname);
+  if (supportsZodiac) {
+    request.input('zodiacSign', sql.NVarChar(64), data.zodiacSign);
+  }
     const zodiacInsertColumn = supportsZodiac ? ', ZodiacSign' : '';
     const zodiacInsertValue = supportsZodiac ? ', @zodiacSign' : '';
     const zodiacSelect = supportsZodiac ? ', @zodiacSign AS zodiacSign' : ', CAST(NULL AS NVARCHAR(64)) AS zodiacSign';
@@ -304,12 +306,12 @@ export async function createUser(data) {
       DECLARE @id UNIQUEIDENTIFIER = NEWID();
       INSERT INTO Users (
         UserID, Email, PasswordHash, Username, CreatedAt,
-        PartnerEmail, CoupleType, Country, City, Partner1Nickname, Partner2Nickname${zodiacInsertColumn},
+        PartnerEmail, CoupleType, Country, City, Latitude, Longitude, Partner1Nickname, Partner2Nickname${zodiacInsertColumn},
         IsEmailVerified, IsPartnerEmailVerified
       )
       VALUES (
         @id, @email, @passwordHash, @username, SYSUTCDATETIME(),
-        @partnerEmail, @coupleType, @country, @city, @partner1Nickname, @partner2Nickname${zodiacInsertValue},
+        @partnerEmail, @coupleType, @country, @city, @latitude, @longitude, @partner1Nickname, @partner2Nickname${zodiacInsertValue},
         0, 0
       );
       SELECT CAST(@id AS NVARCHAR(100)) AS id, LOWER(@email) AS email${zodiacSelect};
@@ -327,16 +329,18 @@ export async function createSingleUser(data) {
     const partner2Nickname = typeof data.partner2Nickname === 'string' && data.partner2Nickname.trim().length
         ? data.partner2Nickname.trim()
         : partner1Nickname;
-    const request = pool
-        .request()
-        .input('email', sql.NVarChar(320), normalizedEmail)
-        .input('passwordHash', sql.NVarChar(255), data.passwordHash)
-        .input('username', sql.NVarChar(255), data.username)
-        .input('partner1Nickname', sql.NVarChar(255), partner1Nickname)
-        .input('partner2Nickname', sql.NVarChar(255), partner2Nickname)
-        .input('country', sql.NVarChar(255), data.country ?? null)
-        .input('city', sql.NVarChar(255), data.city ?? null)
-        .input('coupleType', sql.NVarChar(50), null);
+  const request = pool
+    .request()
+    .input('email', sql.NVarChar(320), normalizedEmail)
+    .input('passwordHash', sql.NVarChar(255), data.passwordHash)
+    .input('username', sql.NVarChar(255), data.username)
+    .input('partner1Nickname', sql.NVarChar(255), partner1Nickname)
+    .input('partner2Nickname', sql.NVarChar(255), partner2Nickname)
+    .input('country', sql.NVarChar(255), data.country ?? null)
+    .input('city', sql.NVarChar(255), data.city ?? null)
+    .input('latitude', sql.Decimal(9, 6), data.latitude ?? null)
+    .input('longitude', sql.Decimal(9, 6), data.longitude ?? null)
+    .input('coupleType', sql.NVarChar(50), null);
     if (supportsZodiac) {
         request.input('zodiacSign', sql.NVarChar(64), zodiac);
     }
@@ -356,6 +360,8 @@ export async function createSingleUser(data) {
         CoupleType,
         Country,
         City,
+        Latitude,
+        Longitude,
         Partner1Nickname,
         Partner2Nickname,
         ${supportsZodiac ? 'ZodiacSign,' : ''}
@@ -373,6 +379,8 @@ export async function createSingleUser(data) {
         @coupleType,
         @country,
         @city,
+        @latitude,
+        @longitude,
         @partner1Nickname,
         @partner2Nickname${zodiacInsertValue},
         0,

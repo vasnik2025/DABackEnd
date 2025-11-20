@@ -251,6 +251,8 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
              Users.IsOnline as isOnline,
              Users.City as city,
              Users.Country as country,
+             Users.Latitude as latitude,
+             Users.Longitude as longitude,
              ${usersZodiacSelect}
              Users.IsEmailVerified as isEmailVerified,
              Users.CoupleType as coupleType,
@@ -326,9 +328,11 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
                Users.UpdatedAt as updatedAt,
                Users.IsOnline as isOnline,
                Users.City as city,
-               Users.Country as country,
-               ${usersZodiacSelect}
-               Users.IsEmailVerified as isEmailVerified,
+              Users.Country as country,
+              Users.Latitude as latitude,
+              Users.Longitude as longitude,
+              ${usersZodiacSelect}
+              Users.IsEmailVerified as isEmailVerified,
                Users.CoupleType as coupleType,
                Users.PartnerEmail as partnerEmail,
                Users.IsPartnerEmailVerified as isPartnerEmailVerified,
