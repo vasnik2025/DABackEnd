@@ -2,6 +2,7 @@ import type { ConnectionPool } from "mssql";
 import { getPool, sql } from "../config/db";
 
 let cachedUsersTableSupportsZodiacSign: boolean | null = null;
+let cachedSingleUsersTableExists: boolean | null = null;
 
 export async function usersTableSupportsZodiacSign(pool?: ConnectionPool): Promise<boolean> {
     if (cachedUsersTableSupportsZodiacSign !== null) {
@@ -20,10 +21,34 @@ export async function usersTableSupportsZodiacSign(pool?: ConnectionPool): Promi
     cachedUsersTableSupportsZodiacSign = Boolean(result.recordset?.length);
     return cachedUsersTableSupportsZodiacSign;
 }
+
+async function singleUsersTableExists(pool?: ConnectionPool): Promise<boolean> {
+    if (cachedSingleUsersTableExists !== null) {
+        return cachedSingleUsersTableExists;
+    }
+    const activePool = pool ?? (await getPool());
+    try {
+        const result = await activePool
+            .request()
+            .query(`
+        SELECT 1 AS HasTable
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = 'dbo'
+          AND TABLE_NAME = 'SingleUsers'
+      `);
+        cachedSingleUsersTableExists = Boolean(result.recordset?.length);
+    }
+    catch (error) {
+        console.warn('[db] Failed to detect SingleUsers table; assuming absent', error);
+        cachedSingleUsersTableExists = false;
+    }
+    return cachedSingleUsersTableExists;
+}
 const nullZodiacSelect = 'CAST(NULL AS NVARCHAR(64)) AS zodiacSign,';
 export async function findUserByEmail(email) {
     const pool = await getPool();
     const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const hasLegacySinglesTable = await singleUsersTableExists(pool);
     const zodiacSelect = supportsZodiac ? 'ZodiacSign AS zodiacSign,' : nullZodiacSelect;
     const normalized = email.toLowerCase();
     const couple = await pool
@@ -69,10 +94,11 @@ export async function findUserByEmail(email) {
             kind: isSingleAccount ? 'single' : 'couple',
         };
     }
-    const single = await pool
-        .request()
-        .input('email', normalized)
-        .query(`
+    if (hasLegacySinglesTable) {
+        const single = await pool
+            .request()
+            .input('email', normalized)
+            .query(`
       SELECT TOP 1
         CAST(UserID AS NVARCHAR(100)) AS id,
         LOWER(Email) AS email,
@@ -82,28 +108,30 @@ export async function findUserByEmail(email) {
       FROM SingleUsers
       WHERE LOWER(Email) = @email
     `);
-    if (single.recordset?.length) {
-        const row = single.recordset[0];
-        return {
-            id: String(row.id),
-            email: String(row.email ?? ''),
-            username: row.username ?? null,
-            partnerEmail: null,
-            partner1Nickname: null,
-            partner2Nickname: null,
-            coupleType: 'SINGLE',
-            zodiacSign: null,
-            passwordHash: row.passwordHash ?? null,
-            isEmailVerified: Boolean(row.isEmailVerified),
-            isPartnerEmailVerified: true,
-            kind: 'single',
-        };
+        if (single.recordset?.length) {
+            const row = single.recordset[0];
+            return {
+                id: String(row.id),
+                email: String(row.email ?? ''),
+                username: row.username ?? null,
+                partnerEmail: null,
+                partner1Nickname: null,
+                partner2Nickname: null,
+                coupleType: 'SINGLE',
+                zodiacSign: null,
+                passwordHash: row.passwordHash ?? null,
+                isEmailVerified: Boolean(row.isEmailVerified),
+                isPartnerEmailVerified: true,
+                kind: 'single',
+            };
+        }
     }
     return null;
 }
 export async function findUserByUsernameOrEmail(usernameOrEmail) {
     const pool = await getPool();
     const supportsZodiac = await usersTableSupportsZodiacSign(pool);
+    const hasLegacySinglesTable = await singleUsersTableExists(pool);
     const zodiacSelect = supportsZodiac ? 'ZodiacSign AS zodiacSign,' : nullZodiacSelect;
     const normalized = usernameOrEmail.toLowerCase();
     const res = await pool
@@ -158,6 +186,9 @@ export async function findUserByUsernameOrEmail(usernameOrEmail) {
             activeLoginEmail,
             kind: isSingleAccount ? 'single' : 'couple',
         };
+    }
+    if (!hasLegacySinglesTable) {
+        return null;
     }
     const singleResult = await pool
         .request()
@@ -430,7 +461,8 @@ export async function setUserEmailVerified(userId) {
         .input('UserID', sql.VarChar(255), userId)
         .query('UPDATE Users SET IsEmailVerified = 1 WHERE UserID = TRY_CONVERT(UNIQUEIDENTIFIER, @UserID)');
     const updated = result.rowsAffected?.[0] ?? 0;
-    if (!updated) {
+    const hasLegacySinglesTable = await singleUsersTableExists(pool);
+    if (!updated && hasLegacySinglesTable) {
         await pool
             .request()
             .input('UserID', sql.VarChar(255), userId)
@@ -460,6 +492,13 @@ export async function getUserVerificationStatus(userId) {
         return {
             isEmailVerified: Boolean(record.isEmailVerified),
             isPartnerEmailVerified: Boolean(record.isPartnerEmailVerified),
+        };
+    }
+    const hasLegacySinglesTable = await singleUsersTableExists(pool);
+    if (!hasLegacySinglesTable) {
+        return {
+            isEmailVerified: false,
+            isPartnerEmailVerified: true,
         };
     }
     const singleResult = await pool

@@ -195,6 +195,8 @@ async function getAllUsers(req, res, next) {
              Users.IsOnline as isOnline,
              Users.City as city,
              Users.Country as country,
+             Users.Latitude as latitude,
+             Users.Longitude as longitude,
              ${usersZodiacSelect}
              Users.IsEmailVerified as isEmailVerified,
              Users.CoupleType as coupleType,
@@ -269,9 +271,11 @@ async function getUserById(req, res, next) {
                Users.UpdatedAt as updatedAt,
                Users.IsOnline as isOnline,
                Users.City as city,
-               Users.Country as country,
-               ${usersZodiacSelect}
-               Users.IsEmailVerified as isEmailVerified,
+              Users.Country as country,
+              Users.Latitude as latitude,
+              Users.Longitude as longitude,
+              ${usersZodiacSelect}
+              Users.IsEmailVerified as isEmailVerified,
                Users.CoupleType as coupleType,
                Users.PartnerEmail as partnerEmail,
                Users.IsPartnerEmailVerified as isPartnerEmailVerified,

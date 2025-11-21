@@ -23,6 +23,7 @@ const db_1 = require("../config/db");
 const userService_1 = require("../services/userService");
 const passwordResetService_1 = require("../services/passwordResetService");
 const emailService_1 = require("../utils/emailService");
+const geocoding_1 = require("../utils/geocoding");
 const passwordShare_1 = require("../utils/passwordShare");
 const passwordPolicy_1 = require("../utils/passwordPolicy");
 const COOKIE_NAME = 'sua';
@@ -103,6 +104,10 @@ async function register(req, res) {
         const trimmedCountry = country.trim();
         const trimmedCity = city.trim();
         const normalizedZodiacSign = zodiacSign.trim();
+        let resolvedCoordinates = null;
+        if (trimmedCity || trimmedCountry) {
+            resolvedCoordinates = await (0, geocoding_1.geocodeCityCountry)(trimmedCity || null, trimmedCountry || null);
+        }
         if (!normalizedZodiacSign.length) {
             return res.status(400).json({ message: 'Please select your zodiac sign.' });
         }
@@ -127,6 +132,8 @@ async function register(req, res) {
                 country: trimmedCountry || null,
                 city: trimmedCity || null,
                 zodiacSign: normalizedZodiacSign,
+                latitude: resolvedCoordinates?.latitude ?? null,
+                longitude: resolvedCoordinates?.longitude ?? null,
             });
             const manualVerificationHints = [];
             const exposeVerificationTokens = shouldExposeVerificationTokens();
@@ -193,6 +200,8 @@ async function register(req, res) {
             partner1Nickname: trimmedPartner1Nickname,
             partner2Nickname: trimmedPartner2Nickname,
             zodiacSign: normalizedZodiacSign,
+            latitude: resolvedCoordinates?.latitude ?? null,
+            longitude: resolvedCoordinates?.longitude ?? null,
         };
         const user = await (0, userService_1.createUser)(userPayload);
         const manualVerificationHints = [];
